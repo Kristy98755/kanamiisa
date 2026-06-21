@@ -231,11 +231,13 @@ async function workerProcess(audioBlob, onProgress) {
         const chunkFiles = [];
         for (let i = 0; i < numChunks; i++) {
             const startSec = i * segmentTime;
-            const outName = `chunk_${i}.wav`;
+            const outName = `chunk_${i}.webm`;
             await ffmpeg.run(
                 '-ss', String(startSec),
                 '-i', inputName,
                 '-t', String(segmentTime),
+                '-c:a', 'libopus',
+                '-b:a', '64k',
                 '-ar', '16000',
                 '-ac', '1',
                 '-y',
@@ -248,11 +250,11 @@ async function workerProcess(audioBlob, onProgress) {
         }
         try { ffmpeg.FS('unlink', inputName); } catch (e) {}
 
-        console.log(`[Worker] Created ${chunkFiles.length} WAV chunks`);
+        console.log(`[Worker] Created ${chunkFiles.length} WebM chunks`);
         onProgress(0, `Получено ${chunkFiles.length} фрагментов`, 18);
 
         for (let i = 0; i < chunkFiles.length; i++) {
-            const chunkBlob = new Blob([chunkFiles[i].data], { type: 'audio/wav' });
+            const chunkBlob = new Blob([chunkFiles[i].data], { type: 'audio/webm' });
             const pct = 18 + Math.round(((i + 1) / chunkFiles.length) * 52);
             onProgress(0, `Фрагмент ${i + 1}/${chunkFiles.length} (${(chunkBlob.size / 1024).toFixed(0)} КБ) — распознавание...`, pct);
 
