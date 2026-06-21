@@ -332,6 +332,7 @@ async function generateMedicalHistory(transcript, env) {
     // Groq API (free tier, OpenAI-compatible)
     if (env.GROQ_API_KEY) {
         try {
+            console.log('[LLM] Trying Groq API...');
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -356,37 +357,49 @@ async function generateMedicalHistory(transcript, env) {
 
             const data = await response.json();
             if (data.choices && data.choices[0]) {
+                console.log('[LLM] Groq success');
                 return parseJSON(data.choices[0].message.content);
             }
         } catch (err) {
-            console.warn('Groq LLM failed:', err.message);
+            console.error('[LLM] Groq failed:', err.message);
         }
     }
 
-    // Workers AI LLM (free tier)
+    // Workers AI LLM — try multiple models
     if (env.AI) {
-        try {
-            console.log('Calling Workers AI LLM...');
-            const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                max_tokens: 4096,
-                temperature: 0.3
-            });
+        const models = [
+            '@cf/meta/llama-3.2-3b-instruct',
+            '@cf/meta/llama-3.1-8b-instruct',
+            '@cf/mistral/mistral-7b-instruct-v0.1',
+        ];
 
-            console.log('LLM response:', JSON.stringify(response).slice(0, 300));
+        for (const model of models) {
+            try {
+                console.log(`[LLM] Trying ${model}...`);
+                const response = await env.AI.run(model, {
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    max_tokens: 4096,
+                    temperature: 0.3
+                });
 
-            if (response && response.response) {
-                return parseJSON(response.response);
+                console.log(`[LLM] ${model} response:`, JSON.stringify(response).slice(0, 300));
+
+                if (response && response.response) {
+                    console.log(`[LLM] ${model} success`);
+                    return parseJSON(response.response);
+                }
+
+                console.warn(`[LLM] ${model} returned empty response`);
+            } catch (err) {
+                console.error(`[LLM] ${model} failed:`, err.message);
             }
-        } catch (err) {
-            console.warn('Workers AI LLM failed:', err.message);
         }
     }
 
-    throw new Error('AI model not configured. Set GROQ_API_KEY secret or enable Workers AI.');
+    throw new Error('Не удалось сгенерировать историю болезни. AI-модели недоступны.');
 }
 
 /**
