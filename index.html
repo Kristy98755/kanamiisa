@@ -1,3 +1,178 @@
-<html>
-nothing here...
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MEDIK_KGZ</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #fffaf4;
+      color: #143211;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      padding: 40px 20px 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 16px;
+      background: #5d755d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fffaf4;
+      font-size: 36px;
+      font-weight: 700;
+    }
+
+    .name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #5d755d;
+      margin-bottom: 4px;
+    }
+
+    .bio {
+      font-size: 13px;
+      color: #8a9988;
+      text-align: center;
+      line-height: 1.5;
+      margin-bottom: 28px;
+      max-width: 360px;
+    }
+
+    .section-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #143211;
+      text-align: center;
+      margin-bottom: 12px;
+      width: 100%;
+    }
+
+    .links {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .link-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-radius: 10px;
+      text-decoration: none;
+      color: #fff;
+      font-weight: 600;
+      font-size: 14px;
+      transition: opacity .2s, transform .1s;
+      border: none;
+      cursor: pointer;
+    }
+
+    .link-btn:hover { opacity: .85; transform: scale(1.01); }
+    .link-btn:active { transform: scale(.98); }
+
+    .link-btn .icon {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+      fill: currentColor;
+    }
+
+    .social-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      margin-bottom: 28px;
+    }
+
+    .social-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      text-decoration: none;
+      color: #fff;
+      transition: opacity .2s, transform .1s;
+    }
+
+    .social-btn:hover { opacity: .85; transform: scale(1.08); }
+    .social-btn:active { transform: scale(.95); }
+
+    .social-btn .icon { width: 24px; height: 24px; fill: currentColor; }
+
+    .divider {
+      width: 60%;
+      border: none;
+      border-top: 1px solid #d6cdc2;
+      margin: 4px 0 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="avatar">M</div>
+    <div class="name">MEDIK_KGZ</div>
+    <p class="bio">
+      Привет, друг! Меня зовут Канами, и я очень начинающий косплеер, по совместительству курьер, аникейщик, будущий медик и меломан)
+    </p>
+
+    <div class="social-row">
+      <a class="social-btn" href="https://instagram.com/kanami_coser/" target="_blank" title="Instagram" style="background:#c13584;">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4H7.6m9.65 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10m0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+      </a>
+      <a class="social-btn" href="https://t.me/medik_kgz" target="_blank" title="Telegram" style="background:#2AABEE;">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+      </a>
+      <a class="social-btn" href="https://www.tiktok.com/@kanashiiookami/" target="_blank" title="TikTok" style="background:#010101;">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M16.6 5.82s.51.5 0 0A4.278 4.278 0 0 1 15.54 3h-3.09v12.4a2.592 2.592 0 0 1-2.59 2.5c-1.42 0-2.6-1.16-2.6-2.6 0-1.72 1.66-3.01 3.37-2.48V9.66c-3.45-.46-6.47 2.22-6.47 5.64 0 3.33 2.76 5.7 5.69 5.7 3.14 0 5.69-2.55 5.69-5.7V9.01a7.35 7.35 0 0 0 4.3 1.38V7.3s-1.88.09-3.24-1.48z"/></svg>
+      </a>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section-label">Прочее:</div>
+
+    <div class="links">
+      <a class="link-btn" href="https://open.spotify.com/artist/449J7u5g44rhENUk1eyVkn?si=wgN4GnxPSOSOrtI7UInn5Q" target="_blank" style="background:#74b816;">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        SPOTIFY
+      </a>
+      <a class="link-btn" href="https://music.yandex.ru/artist/24455840" target="_blank" style="background:#ffd43b; color:#143211;">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM5 10a1 1 0 0 0-2 0 9 9 0 0 0 8 8.94V22h2v-3.06A9 9 0 0 0 22 10a1 1 0 0 0-2 0 7 7 0 0 1-14 0z"/></svg>
+        ЯНДЕКС.МУЗЫКА
+      </a>
+      <a class="link-btn" href="http://github.com/kristy98755" target="_blank" style="background:#862e9c;">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+        ГИТХАБ
+      </a>
+    </div>
+
+  </div>
+</body>
 </html>
