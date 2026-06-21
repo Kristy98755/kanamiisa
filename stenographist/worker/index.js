@@ -110,7 +110,9 @@ function handleProcessSSE(audioFile, env) {
                 sendEvent({ type: 'result', data: { transcript, medicalHistory } });
 
             } catch (err) {
-                sendEvent({ type: 'error', message: err.message });
+                const errorData = { type: 'error', message: err.message };
+                if (err.rawContent) errorData.rawContent = err.rawContent;
+                sendEvent(errorData);
             }
 
             controller.close();
@@ -329,48 +331,52 @@ async function generateMedicalHistory(transcript, env) {
 
     const userPrompt = `Транскрипция медицинской записи:\n\n${transcript}`;
 
-    // Arli AI (OpenAI-compatible, free tier: Qwen-3.5-27B-Derestricted)
+    // Arli AI (OpenAI-compatible, free tier: Qwen3.5-27B-Derestricted)
     if (env.ARLI_API_KEY) {
-        try {
-            console.log('[LLM] Calling Arli AI (Qwen-3.5-27B)...');
-            const response = await fetch('https://api.arliai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${env.ARLI_API_KEY}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    model: 'Qwen3.5-27B-Derestricted',
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt }
-                    ],
-                    max_tokens: 4096,
-                    temperature: 0.3
-                })
-            });
+        console.log('[LLM] Calling Arli AI (Qwen3.5-27B)...');
+        const response = await fetch('https://api.arliai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${env.ARLI_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'Qwen3.5-27B-Derestricted',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                max_tokens: 4096,
+                temperature: 0.3
+            })
+        });
 
-            console.log(`[LLM] Arli AI status: ${response.status}`);
+        console.log(`[LLM] Arli AI status: ${response.status}`);
 
-            if (!response.ok) {
-                const errText = await response.text();
-                console.error(`[LLM] Arli AI error ${response.status}:`, errText);
-                throw new Error(`Arli API error ${response.status}: ${errText}`);
-            }
-
-            const data = await response.json();
-            console.log('[LLM] Arli AI response:', JSON.stringify(data).slice(0, 500));
-
-            if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-                console.log('[LLM] Arli AI success');
-                return parseJSON(data.choices[0].message.content);
-            }
-
-            throw new Error('Arli AI returned empty content');
-        } catch (err) {
-            console.error('[LLM] Arli AI failed:', err.message);
-            throw err;
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error(`[LLM] Arli AI error ${response.status}:`, errText);
+            throw new Error(`Arli API error ${response.status}: ${errText}`);
         }
+
+        const data = await response.json();
+
+        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+            const content = data.choices[0].message.content;
+            console.log('[LLM] Arli AI raw content:', content);
+
+            try {
+                return parseJSON(content);
+            } catch (parseErr) {
+                console.error('[LLM] JSON parse failed:', parseErr.message);
+                // Throw with raw content attached for debugging
+                const err = new Error(`JSON parse error: ${parseErr.message}\n\n--- RAW LLM RESPONSE ---\n${content}`);
+                err.rawContent = content;
+                throw err;
+            }
+        }
+
+        throw new Error('Arli AI returned empty content');
     }
 
     throw new Error('ARLI_API_KEY не настроен.');

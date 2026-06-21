@@ -264,6 +264,9 @@ async function handleSSEResponse(response, onProgress) {
                         result = event.data;
                     } else if (event.type === 'error') {
                         console.error('[SSE] Server error:', event.message);
+                        if (event.rawContent) {
+                            console.log('[SSE] Raw LLM response:\n', event.rawContent);
+                        }
                         sseError = event.message;
                     }
                 } catch (e) {
