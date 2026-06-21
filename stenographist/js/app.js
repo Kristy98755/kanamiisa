@@ -448,11 +448,16 @@
                 result = await workerProcess(audioBlob, handleProgress);
             }
 
+            console.log('[App] Processing complete:', result);
+            if (!result || !result.medicalHistory) {
+                console.error('[App] Result or medicalHistory is null:', result);
+                throw new Error('Сервер не вернул данные. Проверьте консоль.');
+            }
+
             showResult(result);
             saveRecording(result.transcript, result.medicalHistory);
         } catch (err) {
-            showToast('Ошибка обработки: ' + err.message);
-            console.error('Processing error:', err);
+            console.error('[App] Processing error:', err);
             inputSection.hidden = false;
             progressSection.hidden = true;
         }
@@ -490,6 +495,11 @@
 
     // --- Result ---
     function showResult(result) {
+        if (!result || !result.medicalHistory) {
+            console.error('[App] showResult called with null/empty result:', result);
+            return;
+        }
+
         currentMedicalHistory = result.medicalHistory;
         const h = result.medicalHistory;
 

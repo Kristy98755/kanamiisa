@@ -143,6 +143,7 @@ const DEMO_STAGES = [
  * @param {function} onProgress - Called with (stepIndex, detail, percent)
  */
 function demoProcess(onProgress) {
+    console.log('[Demo] Starting demo process');
     return new Promise((resolve) => {
         let currentStep = 0;
         let totalPercent = 0;
@@ -196,11 +197,11 @@ function demoProcess(onProgress) {
 async function workerProcess(audioBlob, onProgress) {
     const workerUrl = DEMO_CONFIG.WORKER_URL;
 
-    // Build form data
+    console.log(`[Worker] Starting process, audio: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
+
     const formData = new FormData();
     formData.append('audio', audioBlob, 'recording.webm');
 
-    // Try SSE endpoint first
     const sseUrl = `${workerUrl}/process`;
     try {
         const response = await fetch(sseUrl, {
@@ -209,22 +210,25 @@ async function workerProcess(audioBlob, onProgress) {
             body: formData
         });
 
+        console.log(`[Worker] Response: ${response.status} ${response.headers.get('content-type')}`);
+
         if (!response.ok) {
-            throw new Error(`Worker error: ${response.status}`);
+            const text = await response.text();
+            console.error(`[Worker] Error body:`, text);
+            throw new Error(`Worker error ${response.status}: ${text}`);
         }
 
-        // Check if response is SSE
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('text/event-stream')) {
             return await handleSSEResponse(response, onProgress);
         }
 
-        // Regular JSON response
         const data = await response.json();
+        console.log('[Worker] JSON result:', data);
         onProgress(3, 'Готово', 100);
         return data;
     } catch (err) {
-        console.error('Worker request failed:', err);
+        console.error('[Worker] Request failed:', err);
         throw err;
     }
 }
@@ -237,6 +241,7 @@ async function handleSSEResponse(response, onProgress) {
     const decoder = new TextDecoder();
     let buffer = '';
     let result = null;
+    let sseError = null;
 
     while (true) {
         const { done, value } = await reader.read();
@@ -252,19 +257,26 @@ async function handleSSEResponse(response, onProgress) {
                     const event = JSON.parse(line.slice(6));
 
                     if (event.type === 'progress') {
+                        console.log(`[SSE] step=${event.step} ${event.detail} ${event.percent}%`);
                         onProgress(event.step, event.detail, event.percent);
                     } else if (event.type === 'result') {
+                        console.log('[SSE] Got result:', event.data);
                         result = event.data;
                     } else if (event.type === 'error') {
-                        throw new Error(event.message);
+                        console.error('[SSE] Server error:', event.message);
+                        sseError = event.message;
                     }
                 } catch (e) {
                     if (e.message !== 'Unexpected end of JSON input') {
-                        console.warn('SSE parse error:', e);
+                        console.warn('[SSE] Parse error:', e, 'line:', line);
                     }
                 }
             }
         }
+    }
+
+    if (sseError) {
+        throw new Error(sseError);
     }
 
     return result;
