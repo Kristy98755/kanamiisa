@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stenographist — Голосовая медицинская запись</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+    <div class="app" id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header__logo">
+                <svg class="header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                    <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+                <h1 class="header__title">Stenographist</h1>
+            </div>
+            <div class="header__badge" id="modeBadge">Демо-режим</div>
+        </header>
+
+        <!-- Layout -->
+        <div class="layout">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar__header">
+                    <h2 class="sidebar__title">История</h2>
+                    <button class="sidebar__clear" id="btnClearHistory" title="Очистить историю">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="sidebar__list" id="historyList">
+                    <p class="sidebar__empty" id="historyEmpty">Нет сохранённых записей</p>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main">
+            <!-- Input Section -->
+            <section class="input-section" id="inputSection">
+                <h2 class="section-title">Исходные данные</h2>
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab tab--active" data-tab="record" id="tabRecord">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab__icon">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                        </svg>
+                        Запись с микрофона
+                    </button>
+                    <button class="tab" data-tab="upload" id="tabUpload">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab__icon">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Загрузить файл
+                    </button>
+                </div>
+
+                <!-- Record Tab -->
+                <div class="tab-content tab-content--active" id="recordPanel">
+                    <div class="recorder">
+                        <div class="recorder__visual">
+                            <canvas id="waveCanvas" width="600" height="120"></canvas>
+                            <div class="recorder__timer" id="recorderTimer">00:00</div>
+                        </div>
+                        <div class="recorder__controls">
+                            <button class="rec-btn" id="btnRecord" title="Начать запись">
+                                <span class="rec-btn__circle"></span>
+                                <svg viewBox="0 0 24 24" fill="currentColor" class="rec-btn__icon rec-btn__icon--mic">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                                    <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="1.5"/>
+                                    <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="1.5"/>
+                                </svg>
+                                <svg viewBox="0 0 24 24" fill="currentColor" class="rec-btn__icon rec-btn__icon--stop">
+                                    <rect x="6" y="6" width="12" height="12" rx="2"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="recorder__hint" id="recorderHint">Нажмите кнопку для начала записи</p>
+                        <button class="recorder__re record" id="btnRerecord" hidden>Записать ещё раз</button>
+                    </div>
+                </div>
+
+                <!-- Upload Tab -->
+                <div class="tab-content" id="uploadPanel">
+                    <div class="upload-zone" id="uploadZone">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="upload-zone__icon">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <p class="upload-zone__text">Перетащите аудиофайл сюда</p>
+                        <p class="upload-zone__subtext">или</p>
+                        <label class="btn btn--upload" for="fileInput">Выберите файл</label>
+                        <input type="file" id="fileInput" accept="audio/*" hidden>
+                        <p class="upload-zone__formats">MP3, WAV, OGG, M4A — до 25 МБ</p>
+                    </div>
+                    <div class="file-preview" id="filePreview" hidden>
+                        <div class="file-preview__info">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="file-preview__icon">
+                                <path d="M9 18V5l12-2v13"/>
+                                <circle cx="6" cy="18" r="3"/>
+                                <circle cx="18" cy="16" r="3"/>
+                            </svg>
+                            <div>
+                                <p class="file-preview__name" id="fileName"></p>
+                                <p class="file-preview__size" id="fileSize"></p>
+                            </div>
+                        </div>
+                        <audio id="audioPreview" controls class="file-preview__audio"></audio>
+                        <div class="file-preview__actions">
+                            <button class="btn btn--process" id="btnProcessFile">Обработать</button>
+                            <button class="btn btn--remove" id="btnRemoveFile">Удалить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Process Button (for recording) -->
+                <div class="process-section" id="processSection" hidden>
+                    <button class="process-btn" id="btnProcessRecord">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="process-btn__icon">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                        </svg>
+                        <span class="process-btn__text">Сформировать историю болезни</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="process-btn__arrow">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                            <polyline points="12 5 19 12 12 19"/>
+                        </svg>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Progress Section -->
+            <section class="progress-section" id="progressSection" hidden>
+                <h2 class="section-title">Обработка</h2>
+                <div class="progress-steps">
+                    <div class="progress-step" id="step1">
+                        <div class="progress-step__indicator">
+                            <div class="progress-step__spinner"></div>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="progress-step__check" hidden>
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <div class="progress-step__content">
+                            <p class="progress-step__title">Загрузка аудио</p>
+                            <p class="progress-step__detail" id="step1Detail"></p>
+                        </div>
+                    </div>
+                    <div class="progress-step" id="step2">
+                        <div class="progress-step__indicator">
+                            <div class="progress-step__spinner"></div>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="progress-step__check" hidden>
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <div class="progress-step__content">
+                            <p class="progress-step__title">Распознавание речи</p>
+                            <p class="progress-step__detail" id="step2Detail"></p>
+                        </div>
+                    </div>
+                    <div class="progress-step" id="step3">
+                        <div class="progress-step__indicator">
+                            <div class="progress-step__spinner"></div>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="progress-step__check" hidden>
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <div class="progress-step__content">
+                            <p class="progress-step__title">Анализ текста</p>
+                            <p class="progress-step__detail" id="step3Detail"></p>
+                        </div>
+                    </div>
+                    <div class="progress-step" id="step4">
+                        <div class="progress-step__indicator">
+                            <div class="progress-step__spinner"></div>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="progress-step__check" hidden>
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <div class="progress-step__content">
+                            <p class="progress-step__title">Формирование истории болезни</p>
+                            <p class="progress-step__detail" id="step4Detail"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-bar__fill" id="progressFill"></div>
+                </div>
+                <p class="progress-section__status" id="progressStatus">Подготовка...</p>
+            </section>
+
+            <!-- Result Section -->
+            <section class="result-section" id="resultSection" hidden>
+                <h2 class="section-title">История болезни</h2>
+
+                <div class="medical-card" id="medicalCard">
+                    <!-- Паспортная часть -->
+                    <div class="medical-card__block">
+                        <h3 class="medical-card__heading">Паспортная часть</h3>
+                        <div class="medical-card__grid medical-card__grid--3">
+                            <div class="medical-card__field">
+                                <span class="medical-card__label">ФИО</span>
+                                <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldFio"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                            </div>
+                            <div class="medical-card__field">
+                                <span class="medical-card__label">Дата рождения</span>
+                                <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldDob"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                            </div>
+                            <div class="medical-card__field">
+                                <span class="medical-card__label">Возраст</span>
+                                <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldAge"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                            </div>
+                            <div class="medical-card__field">
+                                <span class="medical-card__label">Пол</span>
+                                <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldGender"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                            </div>
+                            <div class="medical-card__field">
+                                <span class="medical-card__label">Адрес</span>
+                                <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldAddress"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                            </div>
+                            <div class="medical-card__field">
+                                <span class="medical-card__label">Дата и время поступления</span>
+                                <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldAdmissionDate"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                            </div>
+                            <div class="medical-card__field">
+                                <span class="medical-card__label">Дата и время выписки</span>
+                                <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldDischargeDate"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                            </div>
+                            <div class="medical-card__field">
+                                <span class="medical-card__label">Кем направлен</span>
+                                <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldReferredBy"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                            </div>
+                            <div class="medical-card__field">
+                                <span class="medical-card__label">Отделение</span>
+                                <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldDepartment"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Диагноз -->
+                    <div class="medical-card__block">
+                        <h3 class="medical-card__heading">Диагноз</h3>
+                        <div class="medical-card__field">
+                            <span class="medical-card__label">Диагноз при поступлении</span>
+                            <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldAdmissionDiagnosis"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                        </div>
+                        <div class="medical-card__field">
+                            <span class="medical-card__label">Клинический диагноз — Основной</span>
+                            <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldDiagnosisMain"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                        </div>
+                        <div class="medical-card__field">
+                            <span class="medical-card__label">Осложнения</span>
+                            <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldComplications"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                        </div>
+                        <div class="medical-card__field">
+                            <span class="medical-card__label">Сопутствующие заболевания</span>
+                            <div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldComorbidities"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                        </div>
+                    </div>
+
+                    <!-- Жалобы при поступлении -->
+                    <div class="medical-card__block">
+                        <h3 class="medical-card__heading">Жалобы при поступлении</h3>
+                        <div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="Введите жалобы..." id="fieldComplaints"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                    </div>
+
+                    <!-- Анамнез заболевания -->
+                    <div class="medical-card__block">
+                        <h3 class="medical-card__heading">Анамнез заболевания <span class="medical-card__latin">(Anamnesis morbi)</span></h3>
+                        <div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="Опишите анамнез заболевания..." id="fieldAnamnesis"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                    </div>
+
+                    <!-- Анамнез жизни -->
+                    <div class="medical-card__block">
+                        <h3 class="medical-card__heading">Анамнез жизни <span class="medical-card__latin">(Anamnesis vitae)</span></h3>
+                        <div class="medical-card__field"><span class="medical-card__label">Перенесённые заболевания</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldPastDiseases"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">Операции</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldSurgeries"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">Травмы</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldTraumas"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">Хронические заболевания</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldChronicDiseases"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">Аллергические реакции</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldAllergies"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">Вредные привычки</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldBadHabits"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">Наследственность</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldHeredity"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                    </div>
+
+                    <!-- Status praesens objectivus -->
+                    <div class="medical-card__block">
+                        <h3 class="medical-card__heading">Status praesens objectivus</h3>
+
+                        <h4 class="medical-card__subheading">Общее состояние</h4>
+                        <div class="medical-card__grid medical-card__grid--3">
+                            <div class="medical-card__field"><span class="medical-card__label">Общее состояние</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldGeneralState"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Сознание</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldConsciousness"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Положение</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldPosition"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Температура</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldTemperature"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Рост</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldHeight"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Вес</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldWeight"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">ИМТ</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldBmi"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        </div>
+
+                        <h4 class="medical-card__subheading">Кожа и слизистые</h4>
+                        <div class="medical-card__grid medical-card__grid--3">
+                            <div class="medical-card__field"><span class="medical-card__label">Окраска кожи</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldSkinColor"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Сыпь</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldRash"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Влажность</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldMoisture"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Тургор</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldTurgor"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Состояние слизистых</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldMucous"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        </div>
+
+                        <h4 class="medical-card__subheading">Периферические лимфоузлы</h4>
+                        <div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldLymphNodes"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+
+                        <h4 class="medical-card__subheading">Дыхательная система</h4>
+                        <div class="medical-card__grid medical-card__grid--3">
+                            <div class="medical-card__field"><span class="medical-card__label">ЧДД</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldRespRate"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Носовое дыхание</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldNasalBreathing"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Перкуторный звук</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldPercussion"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Аускультативная картина</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldAuscultation"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Хрипы</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldWheezes"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Одышка</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldDyspnea"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">SpO₂</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldSpo2"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        </div>
+
+                        <h4 class="medical-card__subheading">Сердечно-сосудистая система</h4>
+                        <div class="medical-card__grid medical-card__grid--3">
+                            <div class="medical-card__field"><span class="medical-card__label">АД</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldBp"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Пульс</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldPulse"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Границы сердца</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldHeartBorders"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Тоны сердца</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldHeartTones"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Шумы</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldMurmurs"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Отеки</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldEdema"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        </div>
+
+                        <h4 class="medical-card__subheading">Пищеварительная система</h4>
+                        <div class="medical-card__grid medical-card__grid--3">
+                            <div class="medical-card__field"><span class="medical-card__label">Язык</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldTongue"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Живот</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldAbdomen"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Печень</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldLiver"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Селезенка</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldSpleen"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Стул</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldStool"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        </div>
+
+                        <h4 class="medical-card__subheading">Мочевыделительная система</h4>
+                        <div class="medical-card__grid medical-card__grid--3">
+                            <div class="medical-card__field"><span class="medical-card__label">Мочеиспускание</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldUrination"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Симптом поколачивания</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldPunchingSymptom"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Отёки</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldUrEdema"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        </div>
+
+                        <h4 class="medical-card__subheading">Нервная система</h4>
+                        <div class="medical-card__grid medical-card__grid--2">
+                            <div class="medical-card__field"><span class="medical-card__label">Сознание</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldNervConsciousness"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Ориентация</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldOrientation"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Менингеальные симптомы</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldMeningeal"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                            <div class="medical-card__field"><span class="medical-card__label">Очаговая симптоматика</span><div class="editable-wrap"><span class="medical-card__value" contenteditable="true" data-placeholder="—" id="fieldFocalSymptoms"></span><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        </div>
+                    </div>
+
+                    <!-- Лабораторные и инструментальные исследования -->
+                    <div class="medical-card__block">
+                        <h3 class="medical-card__heading">Данные лабораторных и инструментальных исследований</h3>
+                        <div class="medical-card__field"><span class="medical-card__label">ОАК</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldCbc"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">ОАМ</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldUrinalysis"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">Биохимия</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldBiochemistry"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">Рентгенография</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldXray"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">КТ</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldCt"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">ЭКГ</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldEcg"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                        <div class="medical-card__field"><span class="medical-card__label">Прочее</span><div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="—" id="fieldOtherStudies"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div></div>
+                    </div>
+
+                    <!-- Обоснование диагноза -->
+                    <div class="medical-card__block">
+                        <h3 class="medical-card__heading">Обоснование диагноза</h3>
+                        <div class="editable-wrap editable-wrap--block"><p class="medical-card__text" contenteditable="true" data-placeholder="Обоснование диагноза..." id="fieldDiagnosisRationale"></p><span class="field-actions"><button class="field-actions__btn field-actions__btn--clear" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span></div>
+                    </div>
+
+                    <!-- Transcription -->
+                    <details class="medical-card__details">
+                        <summary class="medical-card__summary">Полная расшифровка записи</summary>
+                        <p class="medical-card__transcript" id="fieldTranscript"></p>
+                    </details>
+                </div>
+
+                <!-- Actions -->
+                <div class="result-actions">
+                    <button class="btn btn--secondary" id="btnCopyJson">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        Копировать JSON
+                    </button>
+                    <button class="btn btn--secondary" id="btnCopyText">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        Копировать текст
+                    </button>
+                    <button class="btn btn--secondary" id="btnPrint">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 6 2 18 2 18 9"/>
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                            <rect x="6" y="14" width="12" height="8"/>
+                        </svg>
+                        Печать
+                    </button>
+                    <button class="btn btn--primary" id="btnNew">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        Новая запись
+                    </button>
+                </div>
+
+                <!-- JSON View -->
+                <details class="json-section">
+                    <summary class="json-section__summary">Просмотр JSON</summary>
+                    <pre class="json-section__code" id="jsonOutput"></pre>
+                </details>
+            </section>
+        </main>
+        </div>
+
+        <!-- Toast -->
+        <div class="toast" id="toast" hidden></div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/demo.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
