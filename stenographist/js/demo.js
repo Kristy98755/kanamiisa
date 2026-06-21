@@ -206,7 +206,7 @@ async function workerProcess(audioBlob, onProgress) {
     const durationSec = audioBuffer.duration;
     console.log(`[Worker] Audio duration: ${durationSec.toFixed(1)}s`);
 
-    const CHUNK_DURATION = 60; // seconds per chunk
+    const CHUNK_DURATION = 60;
     const needsChunking = durationSec > 90;
 
     let fullTranscript = '';
@@ -218,29 +218,16 @@ async function workerProcess(audioBlob, onProgress) {
         for (let i = 0; i < numChunks; i++) {
             const startSec = i * CHUNK_DURATION;
             const endSec = Math.min((i + 1) * CHUNK_DURATION, durationSec);
-            const percent = Math.round((i / numChunks) * 30);
+            const chunkDuration = endSec - startSec;
 
-            onProgress(0, `Фрагмент ${i + 1}/${numChunks} (${startSec.toFixed(0)}-${endSec.toFixed(0)}с)...`, percent);
+            onProgress(0, `Фрагмент ${i + 1}/${numChunks} (${startSec.toFixed(0)}-${endSec.toFixed(0)}с)...`, Math.round((i / numChunks) * 30));
 
-            // Extract chunk
-            const chunkBuffer = audioBuffer;
-            const sampleRate = audioBuffer.sampleRate;
-            const startSample = Math.floor(startSec * sampleRate);
-            const endSample = Math.floor(endSec * sampleRate);
-            const length = endSample - startSample;
+            // Encode chunk via MediaRecorder
+            const chunkBlob = await encodeChunk(audioBuffer, startSec, chunkDuration);
+            console.log(`[Worker] Chunk ${i + 1}: ${chunkBlob.size} bytes`);
 
-            const offlineCtx = new OfflineAudioContext(1, length, sampleRate);
-            const source = offlineCtx.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(offlineCtx.destination);
-            source.start(0, startSec, endSec - startSec);
-
-            const rendered = await offlineCtx.startRendering();
-            const wavBlob = audioBufferToWav(rendered);
-
-            // Send chunk
             const formData = new FormData();
-            formData.append('audio', wavBlob, `chunk_${i}.wav`);
+            formData.append('audio', chunkBlob, `chunk_${i}.webm`);
 
             const response = await fetch(`${workerUrl}/process?mode=transcribe`, {
                 method: 'POST',
@@ -256,12 +243,11 @@ async function workerProcess(audioBlob, onProgress) {
             console.log(`[Worker] Chunk ${i + 1} transcript:`, result.transcript);
             fullTranscript += (fullTranscript ? ' ' : '') + result.transcript;
 
-            onProgress(1, `Распознано: ${countWords(fullTranscript)} слов (${i + 1}/${numChunks})`, 30 + percent);
+            onProgress(1, `Распознано: ${countWords(fullTranscript)} слов (${i + 1}/${numChunks})`, 30);
         }
 
         audioContext.close();
     } else {
-        // Short audio — send as-is
         onProgress(0, 'Отправка аудио...', 5);
 
         const formData = new FormData();
@@ -312,66 +298,45 @@ async function workerProcess(audioBlob, onProgress) {
     return data;
 }
 
+/**
+ * Encode a chunk of AudioBuffer into WebM/Opus via MediaRecorder.
+ */
+function encodeChunk(audioBuffer, startSec, durationSec) {
+    return new Promise((resolve) => {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+
+        const dest = ctx.createMediaStreamDestination();
+        source.connect(dest);
+
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus'
+            : 'audio/webm';
+
+        const recorder = new MediaRecorder(dest.stream, { mimeType });
+        const chunks = [];
+
+        recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) chunks.push(e.data);
+        };
+
+        recorder.onstop = () => {
+            ctx.close();
+            resolve(new Blob(chunks, { type: mimeType }));
+        };
+
+        recorder.start();
+        source.start(0, startSec, durationSec);
+
+        // Stop after chunk duration + small buffer
+        setTimeout(() => recorder.stop(), (durationSec + 0.1) * 1000);
+    });
+}
+
 function countWords(text) {
     return text.split(/\s+/).filter(w => w.length > 0).length;
-}
-
-/**
- * Convert AudioBuffer to WAV blob.
- */
-function audioBufferToWav(buffer) {
-    const numChannels = buffer.numberOfChannels;
-    const sampleRate = buffer.sampleRate;
-    const format = 1; // PCM
-    const bitDepth = 16;
-
-    const bytesPerSample = bitDepth / 8;
-    const blockAlign = numChannels * bytesPerSample;
-
-    const dataLength = buffer.length * numChannels * bytesPerSample;
-    const headerLength = 44;
-    const totalLength = headerLength + dataLength;
-
-    const arrayBuffer = new ArrayBuffer(totalLength);
-    const view = new DataView(arrayBuffer);
-
-    // WAV header
-    writeString(view, 0, 'RIFF');
-    view.setUint32(4, totalLength - 8, true);
-    writeString(view, 8, 'WAVE');
-    writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true); // PCM chunk size
-    view.setUint16(20, format, true);
-    view.setUint16(22, numChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * blockAlign, true);
-    view.setUint16(32, blockAlign, true);
-    view.setUint16(34, bitDepth, true);
-    writeString(view, 36, 'data');
-    view.setUint32(40, dataLength, true);
-
-    // Interleave channels
-    const channels = [];
-    for (let i = 0; i < numChannels; i++) {
-        channels.push(buffer.getChannelData(i));
-    }
-
-    let offset = headerLength;
-    for (let i = 0; i < buffer.length; i++) {
-        for (let ch = 0; ch < numChannels; ch++) {
-            const sample = Math.max(-1, Math.min(1, channels[ch][i]));
-            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-            offset += 2;
-        }
-    }
-
-    return new Blob([arrayBuffer], { type: 'audio/wav' });
-}
-
-function writeString(view, offset, str) {
-    for (let i = 0; i < str.length; i++) {
-        view.setUint8(offset + i, str.charCodeAt(i));
-    }
 }
 
 /**
