@@ -182,7 +182,7 @@ async function transcribeAudio(audioFile, env) {
     }
     */
 
-    throw new Error('Speech-to-text service not configured. Add AI binding or external API key.');
+    throw new Error('Speech-to-text service not configured. Enable Workers AI binding or add external API key.');
 }
 
 // ============================================================
@@ -341,7 +341,27 @@ async function generateMedicalHistory(transcript, env) {
         }
     }
 
-    throw new Error('AI model not configured. Set GROQ_API_KEY secret.');
+    // Workers AI LLM (free tier)
+    if (env.AI) {
+        try {
+            const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                max_tokens: 4096,
+                temperature: 0.3
+            });
+
+            if (response && response.response) {
+                return parseJSON(response.response);
+            }
+        } catch (err) {
+            console.warn('Workers AI LLM failed:', err.message);
+        }
+    }
+
+    throw new Error('AI model not configured. Set GROQ_API_KEY secret or enable Workers AI.');
 }
 
 /**
