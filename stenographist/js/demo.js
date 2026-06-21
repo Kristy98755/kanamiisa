@@ -212,7 +212,6 @@ async function workerProcess(audioBlob, onProgress) {
     let fullTranscript = '';
 
     if (durationSec > MAX_CHUNK_SEC) {
-        // Split with ffmpeg.wasm
         let numChunks = 1;
         while (durationSec / numChunks > MAX_CHUNK_SEC) numChunks++;
         const segmentTime = Math.ceil(durationSec / numChunks);
@@ -223,46 +222,64 @@ async function workerProcess(audioBlob, onProgress) {
             onProgress(0, `Загрузка ffmpeg: ${Math.round(p * 100)}%`, 3 + Math.round(p * 12));
         });
 
-        onProgress(0, 'Разбиение аудио...', 15);
-        const inputName = 'input.webm';
+        onProgress(0, 'Конвертация в WAV...', 15);
         const inputData = new Uint8Array(arrayBuffer);
+        const ext = audioBlob.type.includes('mp3') ? 'mp3' : 'webm';
+        const inputName = `input.${ext}`;
         await ffmpeg.FS('writeFile', inputName, inputData);
+        await ffmpeg.run('-i', inputName, '-ar', '16000', '-ac', '1', '-f', 'wav', 'output.wav');
+        const wavData = await ffmpeg.FS('readFile', 'output.wav');
+        console.log(`[Worker] WAV size: ${wavData.length} bytes`);
+        try { ffmpeg.FS('unlink', inputName); } catch (e) {}
+        try { ffmpeg.FS('unlink', 'output.wav'); } catch (e) {}
 
-        const outPattern = 'chunk_%03d.webm';
-        await ffmpeg.run(
-            '-i', inputName,
-            '-f', 'segment',
-            '-segment_time', String(segmentTime),
-            '-c', 'copy',
-            '-reset_timestamps', '1',
-            outPattern
-        );
+        const SAMPLE_RATE = 16000;
+        const BYTES_PER_SAMPLE = 2;
+        const bytesPerSec = SAMPLE_RATE * BYTES_PER_SAMPLE;
+        const headerSize = 44;
+        const pcmSize = wavData.length - headerSize;
+        const totalSamples = Math.floor(pcmSize / BYTES_PER_SAMPLE);
+        const samplesPerChunk = Math.floor(totalSamples / numChunks);
 
-        // Read chunks
+        console.log(`[Worker] WAV: ${totalSamples} samples, ${samplesPerChunk} per chunk`);
+
         const chunkFiles = [];
-        for (let i = 0; i < numChunks + 2; i++) {
-            const name = `chunk_${String(i).padStart(3, '0')}.webm`;
-            try {
-                const data = await ffmpeg.FS('readFile', name);
-                if (data.length > 0) {
-                    chunkFiles.push({ name, data });
-                }
-            } catch (e) {
-                break;
-            }
+        for (let i = 0; i < numChunks; i++) {
+            const startSample = i * samplesPerChunk;
+            const endSample = (i === numChunks - 1) ? totalSamples : (i + 1) * samplesPerChunk;
+            const chunkSamples = endSample - startSample;
+            const chunkPcmBytes = chunkSamples * BYTES_PER_SAMPLE;
+
+            const chunkWav = new Uint8Array(headerSize + chunkPcmBytes);
+            const view = new DataView(chunkWav.buffer);
+
+            const chunkDuration = chunkSamples / SAMPLE_RATE;
+            const chunkDataSize = chunkPcmBytes;
+
+            view.setUint32(4, 36 + chunkDataSize, true);
+            view.setUint32(12, 1, true);
+            view.setUint32(16, 1, true);
+            view.setUint32(20, SAMPLE_RATE, true);
+            view.setUint32(24, SAMPLE_RATE * BYTES_PER_SAMPLE, true);
+            view.setUint16(28, BYTES_PER_SAMPLE, true);
+            view.setUint16(32, BYTES_PER_SAMPLE * 8, true);
+            view.setUint32(36, chunkDataSize, true);
+            chunkWav.set(new TextEncoder().encode('RIFF'), 0);
+            chunkWav.set(new TextEncoder().encode('WAVEfmt '), 0);
+            chunkWav.set(new TextEncoder().encode('data'), 36);
+
+            const pcmStart = headerSize + startSample * BYTES_PER_SAMPLE;
+            chunkWav.set(wavData.slice(pcmStart, pcmStart + chunkPcmBytes), headerSize);
+
+            chunkFiles.push({ name: `chunk_${i}.wav`, data: chunkWav, duration: chunkDuration });
+            console.log(`[Worker] Chunk ${i}: ${chunkDuration.toFixed(1)}s, ${chunkWav.length} bytes`);
         }
 
-        console.log(`[Worker] ffmpeg produced ${chunkFiles.length} chunks`);
+        console.log(`[Worker] Created ${chunkFiles.length} WAV chunks`);
         onProgress(0, `Получено ${chunkFiles.length} фрагментов`, 18);
 
-        // Cleanup ffmpeg FS
-        try { ffmpeg.FS('unlink', inputName); } catch (e) {}
-        for (const f of chunkFiles) {
-            try { ffmpeg.FS('unlink', f.name); } catch (e) {}
-        }
-
         for (let i = 0; i < chunkFiles.length; i++) {
-            const chunkBlob = new Blob([chunkFiles[i].data], { type: 'audio/webm' });
+            const chunkBlob = new Blob([chunkFiles[i].data], { type: 'audio/wav' });
             const pct = 18 + Math.round(((i + 1) / chunkFiles.length) * 52);
             onProgress(0, `Фрагмент ${i + 1}/${chunkFiles.length} (${(chunkBlob.size / 1024).toFixed(0)} КБ) — распознавание...`, pct);
 
