@@ -86,6 +86,7 @@ async function handleProcess(request, env) {
  */
 function handleProcessSSE(audioFile, env) {
     const encoder = new TextEncoder();
+    const headers = corsHeaders(env);
     const stream = new ReadableStream({
         async start(controller) {
             function sendEvent(data) {
@@ -155,14 +156,19 @@ async function transcribeAudio(audioFile, env) {
     }
 
     const audioBuffer = await audioFile.arrayBuffer();
-    const audioArray = [...new Uint8Array(audioBuffer)];
+    const bytes = new Uint8Array(audioBuffer);
 
-    console.log(`Transcribing: ${audioArray.length} bytes`);
+    // Validate audio magic bytes
+    const isValidAudio = validateAudioBytes(bytes, audioFile.name || '');
+    if (!isValidAudio) {
+        throw new Error('Файл не является аудио. Поддерживаются: WebM, MP3, WAV, OGG, M4A.');
+    }
 
-    const result = await Promise.race([
-        env.AI.run('@cf/openai/whisper', { audio: audioArray }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Whisper timeout (30s)')), 30000))
-    ]);
+    console.log(`Transcribing: ${bytes.length} bytes, type: ${audioFile.type}`);
+
+    const result = await env.AI.run('@cf/openai/whisper', {
+        audio: [...bytes]
+    });
 
     console.log('Whisper result:', JSON.stringify(result).slice(0, 200));
 
@@ -171,6 +177,34 @@ async function transcribeAudio(audioFile, env) {
     }
 
     throw new Error('Whisper returned empty result');
+}
+
+/**
+ * Validate audio file by checking magic bytes.
+ */
+function validateAudioBytes(bytes, filename) {
+    if (bytes.length < 12) return false;
+
+    // WebM: 1A 45 DF A3
+    if (bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3) return true;
+
+    // MP3: ID3 tag or FF FB/FF F3/FF F2
+    if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return true; // ID3
+    if (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) return true; // MPEG sync
+
+    // OGG: 4F 67 67 53
+    if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) return true;
+
+    // WAV/RIFF: 52 49 46 46
+    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) return true;
+
+    // M4A/AAC: ftyp box at offset 4
+    if (bytes.length > 8 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) return true;
+
+    // FLAC: 66 4C 61 43
+    if (bytes[0] === 0x66 && bytes[1] === 0x4C && bytes[2] === 0x61 && bytes[3] === 0x43) return true;
+
+    return false;
 }
 
 // ============================================================
@@ -333,17 +367,14 @@ async function generateMedicalHistory(transcript, env) {
     if (env.AI) {
         try {
             console.log('Calling Workers AI LLM...');
-            const response = await Promise.race([
-                env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt }
-                    ],
-                    max_tokens: 4096,
-                    temperature: 0.3
-                }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('LLM timeout (60s)')), 60000))
-            ]);
+            const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                max_tokens: 4096,
+                temperature: 0.3
+            });
 
             console.log('LLM response:', JSON.stringify(response).slice(0, 300));
 
