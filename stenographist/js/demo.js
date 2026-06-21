@@ -4,8 +4,8 @@
  */
 
 const DEMO_CONFIG = {
-    WORKER_URL: '', // Set to your worker URL in production
-    USE_DEMO: true, // Set to false when deploying with real worker
+    WORKER_URL: 'https://stenographist.itismynickname9.workers.dev',
+    USE_DEMO: false,
 };
 
 // Simulated transcription text (as if Whisper recognized it)
