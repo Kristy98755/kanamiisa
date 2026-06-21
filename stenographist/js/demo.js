@@ -201,7 +201,7 @@ async function workerProcess(audioBlob, onProgress) {
 
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const arrayBuffer = await audioBlob.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
     const durationSec = audioBuffer.duration;
     audioContext.close();
 
@@ -209,27 +209,88 @@ async function workerProcess(audioBlob, onProgress) {
     onProgress(0, `Длительность: ${durationSec.toFixed(0)}с`, 2);
 
     const MAX_CHUNK_SEC = 60;
-    let numChunks = 1;
-    while (durationSec / numChunks > MAX_CHUNK_SEC) numChunks++;
-
-    const chunkDuration = durationSec / numChunks;
-    const bytesPerSec = audioBlob.size / durationSec;
-    console.log(`[Worker] Splitting into ${numChunks} chunks of ${chunkDuration.toFixed(1)}s (~${Math.round(bytesPerSec * chunkDuration)} bytes each)`);
-
     let fullTranscript = '';
 
-    for (let i = 0; i < numChunks; i++) {
-        const startByte = Math.round(i * chunkDuration * bytesPerSec);
-        const endByte = Math.round((i + 1) * chunkDuration * bytesPerSec);
-        const chunkBlob = new Blob([arrayBuffer.slice(startByte, endByte)], { type: audioBlob.type });
+    if (durationSec > MAX_CHUNK_SEC) {
+        // Split with ffmpeg.wasm
+        let numChunks = 1;
+        while (durationSec / numChunks > MAX_CHUNK_SEC) numChunks++;
+        const segmentTime = Math.ceil(durationSec / numChunks);
+        console.log(`[Worker] Need ${numChunks} chunks, segment_time=${segmentTime}s`);
 
-        const pct = Math.round(((i + 1) / numChunks) * 60);
-        onProgress(0, `Фрагмент ${i + 1}/${numChunks} (${(chunkBlob.size / 1024).toFixed(0)} КБ) — отправка...`, pct);
+        onProgress(0, 'Загрузка ffmpeg...', 3);
+        const ffmpeg = await loadFFmpeg((p) => {
+            onProgress(0, `Загрузка ffmpeg: ${Math.round(p * 100)}%`, 3 + Math.round(p * 12));
+        });
 
-        console.log(`[Worker] Chunk ${i + 1}/${numChunks}: bytes ${startByte}-${endByte} (${chunkBlob.size} bytes)`);
+        onProgress(0, 'Разбиение аудио...', 15);
+        const inputName = 'input.webm';
+        const inputData = new Uint8Array(arrayBuffer);
+        await ffmpeg.FS('writeFile', inputName, inputData);
+
+        const outPattern = 'chunk_%03d.webm';
+        await ffmpeg.run(
+            '-i', inputName,
+            '-f', 'segment',
+            '-segment_time', String(segmentTime),
+            '-c', 'copy',
+            '-reset_timestamps', '1',
+            outPattern
+        );
+
+        // Read chunks
+        const chunkFiles = [];
+        for (let i = 0; i < numChunks + 2; i++) {
+            const name = `chunk_${String(i).padStart(3, '0')}.webm`;
+            try {
+                const data = await ffmpeg.FS('readFile', name);
+                if (data.length > 0) {
+                    chunkFiles.push({ name, data });
+                }
+            } catch (e) {
+                break;
+            }
+        }
+
+        console.log(`[Worker] ffmpeg produced ${chunkFiles.length} chunks`);
+        onProgress(0, `Получено ${chunkFiles.length} фрагментов`, 18);
+
+        // Cleanup ffmpeg FS
+        try { ffmpeg.FS('unlink', inputName); } catch (e) {}
+        for (const f of chunkFiles) {
+            try { ffmpeg.FS('unlink', f.name); } catch (e) {}
+        }
+
+        for (let i = 0; i < chunkFiles.length; i++) {
+            const chunkBlob = new Blob([chunkFiles[i].data], { type: 'audio/webm' });
+            const pct = 18 + Math.round(((i + 1) / chunkFiles.length) * 52);
+            onProgress(0, `Фрагмент ${i + 1}/${chunkFiles.length} (${(chunkBlob.size / 1024).toFixed(0)} КБ) — распознавание...`, pct);
+
+            const formData = new FormData();
+            formData.append('audio', chunkBlob, chunkFiles[i].name);
+
+            const response = await fetch(`${workerUrl}/process?mode=transcribe`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Chunk ${i + 1} failed: ${response.status} ${errText}`);
+            }
+
+            const result = await response.json();
+            console.log(`[Worker] Chunk ${i + 1} transcript:`, result.transcript);
+            fullTranscript += (fullTranscript ? ' ' : '') + result.transcript;
+
+            onProgress(1, `Распознано: ${countWords(fullTranscript)} слов (${i + 1}/${chunkFiles.length})`, pct);
+        }
+    } else {
+        // Short audio — send directly
+        onProgress(0, 'Распознавание речи...', 10);
 
         const formData = new FormData();
-        formData.append('audio', chunkBlob, `chunk_${i}.webm`);
+        formData.append('audio', audioBlob, 'recording.webm');
 
         const response = await fetch(`${workerUrl}/process?mode=transcribe`, {
             method: 'POST',
@@ -238,15 +299,11 @@ async function workerProcess(audioBlob, onProgress) {
 
         if (!response.ok) {
             const errText = await response.text();
-            console.error(`[Worker] Chunk ${i + 1} error:`, errText);
-            throw new Error(`Chunk ${i + 1} failed: ${response.status} ${errText}`);
+            throw new Error(`Transcribe failed: ${response.status} ${errText}`);
         }
 
         const result = await response.json();
-        console.log(`[Worker] Chunk ${i + 1} transcript:`, result.transcript);
-        fullTranscript += (fullTranscript ? ' ' : '') + result.transcript;
-
-        onProgress(1, `Распознано: ${countWords(fullTranscript)} слов (${i + 1}/${numChunks})`, pct);
+        fullTranscript = result.transcript;
     }
 
     console.log(`[Worker] Full transcript (${countWords(fullTranscript)} words):`, fullTranscript);
@@ -275,6 +332,26 @@ async function workerProcess(audioBlob, onProgress) {
     const data = await response.json();
     onProgress(3, 'Готово', 100);
     return data;
+}
+
+let _ffmpegInstance = null;
+
+async function loadFFmpeg(onProgress) {
+    if (_ffmpegInstance) return _ffmpegInstance;
+
+    const ffmpeg = FFmpeg.createFFmpeg({
+        log: false,
+        logger: ({ message }) => {
+            console.log('[FFmpeg]', message);
+        },
+        progress: ({ ratio }) => {
+            if (onProgress) onProgress(ratio);
+        }
+    });
+
+    await ffmpeg.load();
+    _ffmpegInstance = ffmpeg;
+    return ffmpeg;
 }
 
 function countWords(text) {
