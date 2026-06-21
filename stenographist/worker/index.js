@@ -340,7 +340,7 @@ async function generateMedicalHistory(transcript, env) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'Qwen-3.5-27B-Derestricted',
+                    model: 'Qwen3.5-27B-Derestricted',
                     messages: [
                         { role: 'system', content: systemPrompt },
                         { role: 'user', content: userPrompt }
