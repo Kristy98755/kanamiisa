@@ -35,10 +35,8 @@
     const resultSection = $('#resultSection');
     const inputSection = $('#inputSection');
     const btnNew = $('#btnNew');
-    const btnCopyJson = $('#btnCopyJson');
     const btnCopyText = $('#btnCopyText');
     const btnPrint = $('#btnPrint');
-    const jsonOutput = $('#jsonOutput');
     const modeBadge = $('#modeBadge');
     const toast = $('#toast');
     const sidebar = $('#sidebar');
@@ -134,7 +132,6 @@
             startRecordingUI();
         } catch (err) {
             showToast('Не удалось получить доступ к микрофону');
-            console.error('Microphone access error:', err);
         }
     }
 
@@ -448,16 +445,14 @@
                 result = await workerProcess(audioBlob, handleProgress);
             }
 
-            console.log('[App] Processing complete:', result);
             if (!result || !result.medicalHistory) {
-                console.error('[App] Result or medicalHistory is null:', result);
-                throw new Error('Сервер не вернул данные. Проверьте консоль.');
+                throw new Error('Сервер не вернул данные.');
             }
 
             showResult(result);
             saveRecording(result.transcript, result.medicalHistory);
         } catch (err) {
-            console.error('[App] Processing error:', err);
+            showToast('Ошибка обработки');
             inputSection.hidden = false;
             progressSection.hidden = true;
         }
@@ -496,7 +491,6 @@
     // --- Result ---
     function showResult(result) {
         if (!result || !result.medicalHistory) {
-            console.error('[App] showResult called with null/empty result:', result);
             return;
         }
 
@@ -608,10 +602,6 @@
         // Transcription
         set('fieldTranscript', result.transcript);
 
-        // JSON
-        jsonOutput.textContent = JSON.stringify(result, null, 2);
-
-        // Show
         progressSection.hidden = true;
         resultSection.hidden = false;
 
@@ -622,12 +612,6 @@
     // --- Result Actions ---
     function setupResultActions() {
         btnNew.addEventListener('click', resetToInput);
-
-        btnCopyJson.addEventListener('click', () => {
-            const data = collectHistoryFromDOM();
-            const text = JSON.stringify(data, null, 2);
-            copyToClipboard(text, 'JSON скопирован');
-        });
 
         btnCopyText.addEventListener('click', () => {
             const h = collectHistoryFromDOM();
@@ -956,9 +940,10 @@
     }
 
     async function saveRecording(transcript, medicalHistory) {
-        if (!recordedBlob) return;
+        const blob = recordedBlob || uploadFile;
+        if (!blob) return;
         await RecordingStore.save({
-            blob: recordedBlob,
+            blob,
             transcript,
             medicalHistory
         });
