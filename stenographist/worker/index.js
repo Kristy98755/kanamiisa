@@ -307,55 +307,41 @@ async function generateMedicalHistory(transcript, env) {
 
     const userPrompt = `Транскрипция медицинской записи:\n\n${transcript}`;
 
-    // Method 1: Cloudflare Workers AI
-    if (env.AI) {
+    // Groq API (free tier, OpenAI-compatible)
+    if (env.GROQ_API_KEY) {
         try {
-            const result = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                max_tokens: 4096,
-                temperature: 0.3
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${env.GROQ_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'llama-3.1-8b-instant',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    max_tokens: 4096,
+                    temperature: 0.3
+                })
             });
 
-            if (result && result.response) {
-                return parseJSON(result.response);
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Groq API error ${response.status}: ${errText}`);
+            }
+
+            const data = await response.json();
+            if (data.choices && data.choices[0]) {
+                return parseJSON(data.choices[0].message.content);
             }
         } catch (err) {
-            console.warn('Workers AI LLM failed:', err.message);
+            console.warn('Groq LLM failed:', err.message);
         }
     }
 
-    // Method 2: Fallback — external API
-    /*
-    // Option A: Together AI (free tier available)
-    const TOGETHER_API_KEY = env.TOGETHER_API_KEY;
-    if (TOGETHER_API_KEY) {
-        const response = await fetch('https://api.together.xyz/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${TOGETHER_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                max_tokens: 4096,
-                temperature: 0.3
-            })
-        });
-        const data = await response.json();
-        if (data.choices && data.choices[0]) {
-            return parseJSON(data.choices[0].message.content);
-        }
-    }
-    */
-
-    throw new Error('AI model not configured. Add AI binding or external API key.');
+    throw new Error('AI model not configured. Set GROQ_API_KEY secret.');
 }
 
 /**
@@ -395,12 +381,8 @@ function countWords(text) {
 }
 
 function corsHeaders(env) {
-    const allowedOrigins = env.ALLOWED_ORIGINS
-        ? env.ALLOWED_ORIGINS.split(',')
-        : ['*'];
-
     return {
-        'Access-Control-Allow-Origin': allowedOrigins[0] || '*',
+        'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Accept'
     };
