@@ -6,7 +6,8 @@
     "enabled": true
   },
   "assets": {
-    "directory": "stenographist"
+    "directory": ".",
+    "ignore": [".git/**", ".wrangler/**", "node_modules/**"]
   },
   "compatibility_flags": [
     "nodejs_compat"
