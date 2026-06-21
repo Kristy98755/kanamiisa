@@ -40,7 +40,7 @@ export default {
             }, 200, env);
         }
 
-        // Only POST /process is supported
+        // POST /process — supports ?mode=transcribe|generate
         if (request.method === 'POST' && url.pathname === '/process') {
             return handleProcess(request, env);
         }
@@ -55,25 +55,44 @@ export default {
  * Returns SSE stream with progress events, or JSON result.
  */
 async function handleProcess(request, env) {
-    const headers = corsHeaders(env);
+    const url = new URL(request.url);
+    const mode = url.searchParams.get('mode') || 'full';
 
     try {
         const formData = await request.formData();
         const audioFile = formData.get('audio');
+        const transcriptText = formData.get('transcript');
 
+        const accept = request.headers.get('accept') || '';
+        const useSSE = accept.includes('text/event-stream');
+
+        // Mode: transcribe only (for chunked audio)
+        if (mode === 'transcribe') {
+            if (!audioFile) {
+                return jsonResponse({ error: 'No audio file provided' }, 400, env);
+            }
+            const transcript = await transcribeAudio(audioFile, env);
+            return jsonResponse({ transcript }, 200, env);
+        }
+
+        // Mode: generate only (LLM from transcript)
+        if (mode === 'generate') {
+            if (!transcriptText) {
+                return jsonResponse({ error: 'No transcript provided' }, 400, env);
+            }
+            const medicalHistory = await generateMedicalHistory(transcriptText, env);
+            return jsonResponse({ transcript: transcriptText, medicalHistory }, 200, env);
+        }
+
+        // Mode: full (default) — transcribe + generate
         if (!audioFile) {
             return jsonResponse({ error: 'No audio file provided' }, 400, env);
         }
-
-        // Check if client accepts SSE
-        const accept = request.headers.get('accept') || '';
-        const useSSE = accept.includes('text/event-stream');
 
         if (useSSE) {
             return handleProcessSSE(audioFile, env);
         }
 
-        // Fallback: process without progress streaming
         return await processFull(audioFile, env);
     } catch (err) {
         console.error('Process error:', err);

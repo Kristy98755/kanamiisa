@@ -199,37 +199,178 @@ async function workerProcess(audioBlob, onProgress) {
 
     console.log(`[Worker] Starting process, audio: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
 
-    const formData = new FormData();
-    formData.append('audio', audioBlob, 'recording.webm');
+    // Decode audio to check duration
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const durationSec = audioBuffer.duration;
+    console.log(`[Worker] Audio duration: ${durationSec.toFixed(1)}s`);
 
-    const sseUrl = `${workerUrl}/process`;
-    try {
-        const response = await fetch(sseUrl, {
+    const CHUNK_DURATION = 60; // seconds per chunk
+    const needsChunking = durationSec > 90;
+
+    let fullTranscript = '';
+
+    if (needsChunking) {
+        const numChunks = Math.ceil(durationSec / CHUNK_DURATION);
+        console.log(`[Worker] Chunking into ${numChunks} pieces`);
+
+        for (let i = 0; i < numChunks; i++) {
+            const startSec = i * CHUNK_DURATION;
+            const endSec = Math.min((i + 1) * CHUNK_DURATION, durationSec);
+            const percent = Math.round((i / numChunks) * 30);
+
+            onProgress(0, `Фрагмент ${i + 1}/${numChunks} (${startSec.toFixed(0)}-${endSec.toFixed(0)}с)...`, percent);
+
+            // Extract chunk
+            const chunkBuffer = audioBuffer;
+            const sampleRate = audioBuffer.sampleRate;
+            const startSample = Math.floor(startSec * sampleRate);
+            const endSample = Math.floor(endSec * sampleRate);
+            const length = endSample - startSample;
+
+            const offlineCtx = new OfflineAudioContext(1, length, sampleRate);
+            const source = offlineCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(offlineCtx.destination);
+            source.start(0, startSec, endSec - startSec);
+
+            const rendered = await offlineCtx.startRendering();
+            const wavBlob = audioBufferToWav(rendered);
+
+            // Send chunk
+            const formData = new FormData();
+            formData.append('audio', wavBlob, `chunk_${i}.wav`);
+
+            const response = await fetch(`${workerUrl}/process?mode=transcribe`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Chunk ${i + 1} failed: ${response.status} ${errText}`);
+            }
+
+            const result = await response.json();
+            console.log(`[Worker] Chunk ${i + 1} transcript:`, result.transcript);
+            fullTranscript += (fullTranscript ? ' ' : '') + result.transcript;
+
+            onProgress(1, `Распознано: ${countWords(fullTranscript)} слов (${i + 1}/${numChunks})`, 30 + percent);
+        }
+
+        audioContext.close();
+    } else {
+        // Short audio — send as-is
+        onProgress(0, 'Отправка аудио...', 5);
+
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+
+        const response = await fetch(`${workerUrl}/process?mode=transcribe`, {
             method: 'POST',
-            headers: { 'Accept': 'text/event-stream' },
             body: formData
         });
 
-        console.log(`[Worker] Response: ${response.status} ${response.headers.get('content-type')}`);
-
         if (!response.ok) {
-            const text = await response.text();
-            console.error(`[Worker] Error body:`, text);
-            throw new Error(`Worker error ${response.status}: ${text}`);
+            const errText = await response.text();
+            throw new Error(`Transcribe failed: ${response.status} ${errText}`);
         }
 
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('text/event-stream')) {
-            return await handleSSEResponse(response, onProgress);
-        }
+        const result = await response.json();
+        fullTranscript = result.transcript;
+        audioContext.close();
+    }
 
-        const data = await response.json();
-        console.log('[Worker] JSON result:', data);
-        onProgress(3, 'Готово', 100);
-        return data;
-    } catch (err) {
-        console.error('[Worker] Request failed:', err);
-        throw err;
+    console.log(`[Worker] Full transcript (${countWords(fullTranscript)} words):`, fullTranscript);
+    onProgress(1, `Речь распознана (${countWords(fullTranscript)} слов)`, 35);
+
+    // Step 2: Generate medical history
+    onProgress(2, 'Анализ текста...', 45);
+
+    const formData = new FormData();
+    formData.append('transcript', fullTranscript);
+
+    const response = await fetch(`${workerUrl}/process?mode=generate`, {
+        method: 'POST',
+        headers: { 'Accept': 'text/event-stream' },
+        body: formData
+    });
+
+    if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Generate failed: ${response.status} ${errText}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('text/event-stream')) {
+        return await handleSSEResponse(response, onProgress);
+    }
+
+    const data = await response.json();
+    onProgress(3, 'Готово', 100);
+    return data;
+}
+
+function countWords(text) {
+    return text.split(/\s+/).filter(w => w.length > 0).length;
+}
+
+/**
+ * Convert AudioBuffer to WAV blob.
+ */
+function audioBufferToWav(buffer) {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const format = 1; // PCM
+    const bitDepth = 16;
+
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign = numChannels * bytesPerSample;
+
+    const dataLength = buffer.length * numChannels * bytesPerSample;
+    const headerLength = 44;
+    const totalLength = headerLength + dataLength;
+
+    const arrayBuffer = new ArrayBuffer(totalLength);
+    const view = new DataView(arrayBuffer);
+
+    // WAV header
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, totalLength - 8, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true); // PCM chunk size
+    view.setUint16(20, format, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, dataLength, true);
+
+    // Interleave channels
+    const channels = [];
+    for (let i = 0; i < numChannels; i++) {
+        channels.push(buffer.getChannelData(i));
+    }
+
+    let offset = headerLength;
+    for (let i = 0; i < buffer.length; i++) {
+        for (let ch = 0; ch < numChannels; ch++) {
+            const sample = Math.max(-1, Math.min(1, channels[ch][i]));
+            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+            offset += 2;
+        }
+    }
+
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
+}
+
+function writeString(view, offset, str) {
+    for (let i = 0; i < str.length; i++) {
+        view.setUint8(offset + i, str.charCodeAt(i));
     }
 }
 
