@@ -199,64 +199,37 @@ async function workerProcess(audioBlob, onProgress) {
 
     console.log(`[Worker] Starting process, audio: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
 
-    // Decode audio to check duration
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const arrayBuffer = await audioBlob.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     const durationSec = audioBuffer.duration;
-    console.log(`[Worker] Audio duration: ${durationSec.toFixed(1)}s`);
+    audioContext.close();
 
-    const CHUNK_DURATION = 60;
-    const needsChunking = durationSec > 90;
+    console.log(`[Worker] Audio duration: ${durationSec.toFixed(1)}s`);
+    onProgress(0, `Длительность: ${durationSec.toFixed(0)}с`, 2);
+
+    const MAX_CHUNK_SEC = 60;
+    let numChunks = 1;
+    while (durationSec / numChunks > MAX_CHUNK_SEC) numChunks++;
+
+    const chunkDuration = durationSec / numChunks;
+    const bytesPerSec = audioBlob.size / durationSec;
+    console.log(`[Worker] Splitting into ${numChunks} chunks of ${chunkDuration.toFixed(1)}s (~${Math.round(bytesPerSec * chunkDuration)} bytes each)`);
 
     let fullTranscript = '';
 
-    if (needsChunking) {
-        // Find optimal chunk count: smallest n where duration/n <= 60
-        const MAX_CHUNK_SEC = 60;
-        let numChunks = 1;
-        while (durationSec / numChunks > MAX_CHUNK_SEC) {
-            numChunks++;
-        }
-        const chunkDuration = durationSec / numChunks;
-        console.log(`[Worker] Splitting ${durationSec.toFixed(1)}s into ${numChunks} chunks of ${chunkDuration.toFixed(1)}s`);
+    for (let i = 0; i < numChunks; i++) {
+        const startByte = Math.round(i * chunkDuration * bytesPerSec);
+        const endByte = Math.round((i + 1) * chunkDuration * bytesPerSec);
+        const chunkBlob = new Blob([arrayBuffer.slice(startByte, endByte)], { type: audioBlob.type });
 
-        for (let i = 0; i < numChunks; i++) {
-            const startSec = i * chunkDuration;
-            const chunkPercent = Math.round(((i + 0.5) / numChunks) * 60);
-            onProgress(0, `Кодирование фрагмента ${i + 1}/${numChunks}...`, chunkPercent);
+        const pct = Math.round(((i + 1) / numChunks) * 60);
+        onProgress(0, `Фрагмент ${i + 1}/${numChunks} (${(chunkBlob.size / 1024).toFixed(0)} КБ) — отправка...`, pct);
 
-            const chunkBlob = await encodeChunk(audioBuffer, startSec, chunkDuration);
-            console.log(`[Worker] Chunk ${i + 1}: ${chunkBlob.size} bytes`);
-
-            onProgress(0, `Отправка фрагмента ${i + 1}/${numChunks}...`, Math.round(((i + 1) / numChunks) * 60));
-
-            const formData = new FormData();
-            formData.append('audio', chunkBlob, `chunk_${i}.webm`);
-
-            const response = await fetch(`${workerUrl}/process?mode=transcribe`, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(`Chunk ${i + 1} failed: ${response.status} ${errText}`);
-            }
-
-            const result = await response.json();
-            console.log(`[Worker] Chunk ${i + 1} transcript:`, result.transcript);
-            fullTranscript += (fullTranscript ? ' ' : '') + result.transcript;
-
-            onProgress(1, `Распознано: ${countWords(fullTranscript)} слов (${i + 1}/${numChunks})`, 60 + Math.round(((i + 1) / numChunks) * 10));
-        }
-
-        audioContext.close();
-    } else {
-        onProgress(0, 'Распознавание речи...', 10);
+        console.log(`[Worker] Chunk ${i + 1}/${numChunks}: bytes ${startByte}-${endByte} (${chunkBlob.size} bytes)`);
 
         const formData = new FormData();
-        formData.append('audio', audioBlob, 'recording.webm');
+        formData.append('audio', chunkBlob, `chunk_${i}.webm`);
 
         const response = await fetch(`${workerUrl}/process?mode=transcribe`, {
             method: 'POST',
@@ -265,18 +238,19 @@ async function workerProcess(audioBlob, onProgress) {
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(`Transcribe failed: ${response.status} ${errText}`);
+            console.error(`[Worker] Chunk ${i + 1} error:`, errText);
+            throw new Error(`Chunk ${i + 1} failed: ${response.status} ${errText}`);
         }
 
         const result = await response.json();
-        fullTranscript = result.transcript;
-        audioContext.close();
+        console.log(`[Worker] Chunk ${i + 1} transcript:`, result.transcript);
+        fullTranscript += (fullTranscript ? ' ' : '') + result.transcript;
+
+        onProgress(1, `Распознано: ${countWords(fullTranscript)} слов (${i + 1}/${numChunks})`, pct);
     }
 
     console.log(`[Worker] Full transcript (${countWords(fullTranscript)} words):`, fullTranscript);
     onProgress(1, `Речь распознана (${countWords(fullTranscript)} слов)`, 70);
-
-    // Step 2: Generate medical history
     onProgress(2, 'Генерация истории болезни...', 75);
 
     const formData = new FormData();
@@ -301,42 +275,6 @@ async function workerProcess(audioBlob, onProgress) {
     const data = await response.json();
     onProgress(3, 'Готово', 100);
     return data;
-}
-
-/**
- * Encode a chunk of AudioBuffer into WebM/Opus via MediaRecorder.
- */
-function encodeChunk(audioBuffer, startSec, durationSec) {
-    return new Promise((resolve) => {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const source = ctx.createBufferSource();
-        source.buffer = audioBuffer;
-
-        const dest = ctx.createMediaStreamDestination();
-        source.connect(dest);
-        // Do NOT connect to ctx.destination — that plays audio through speakers
-
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-            ? 'audio/webm;codecs=opus'
-            : 'audio/webm';
-
-        const recorder = new MediaRecorder(dest.stream, { mimeType });
-        const chunks = [];
-
-        recorder.ondataavailable = (e) => {
-            if (e.data.size > 0) chunks.push(e.data);
-        };
-
-        recorder.onstop = () => {
-            ctx.close();
-            resolve(new Blob(chunks, { type: mimeType }));
-        };
-
-        recorder.start();
-        source.start(0, startSec, durationSec);
-
-        setTimeout(() => recorder.stop(), (durationSec + 0.5) * 1000);
-    });
 }
 
 function countWords(text) {
