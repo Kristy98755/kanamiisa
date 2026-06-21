@@ -187,8 +187,14 @@ async function transcribeAudio(audioFile, env) {
 
     console.log(`Transcribing: ${bytes.length} bytes, type: ${audioFile.type}`);
 
-    const result = await env.AI.run('@cf/openai/whisper', {
-        audio: [...bytes],
+    let base64 = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+        base64 += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    }
+    base64 = btoa(base64);
+
+    const result = await env.AI.run('@cf/openai/whisper-large-v3-turbo', {
+        audio: base64,
         language: 'ru'
     });
 
