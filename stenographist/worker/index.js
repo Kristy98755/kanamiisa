@@ -35,7 +35,7 @@ export default {
             return jsonResponse({
                 ok: true,
                 hasAI: !!env.AI,
-                hasGROQ: !!env.GROQ_API_KEY,
+                hasArli: !!env.ARLI_API_KEY,
                 timestamp: new Date().toISOString()
             }, 200, env);
         }
@@ -329,18 +329,18 @@ async function generateMedicalHistory(transcript, env) {
 
     const userPrompt = `Транскрипция медицинской записи:\n\n${transcript}`;
 
-    // Groq API (free tier, OpenAI-compatible)
-    if (env.GROQ_API_KEY) {
+    // Arli AI (OpenAI-compatible, free tier: Qwen-3.5-27B-Derestricted)
+    if (env.ARLI_API_KEY) {
         try {
-            console.log('[LLM] Trying Groq API...');
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            console.log('[LLM] Calling Arli AI (Qwen-3.5-27B)...');
+            const response = await fetch('https://api.arliai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${env.GROQ_API_KEY}`,
+                    'Authorization': `Bearer ${env.ARLI_API_KEY}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'llama-3.1-8b-instant',
+                    model: 'Qwen-3.5-27B-Derestricted',
                     messages: [
                         { role: 'system', content: systemPrompt },
                         { role: 'user', content: userPrompt }
@@ -350,75 +350,30 @@ async function generateMedicalHistory(transcript, env) {
                 })
             });
 
+            console.log(`[LLM] Arli AI status: ${response.status}`);
+
             if (!response.ok) {
                 const errText = await response.text();
-                throw new Error(`Groq API error ${response.status}: ${errText}`);
+                console.error(`[LLM] Arli AI error ${response.status}:`, errText);
+                throw new Error(`Arli API error ${response.status}: ${errText}`);
             }
 
             const data = await response.json();
-            if (data.choices && data.choices[0]) {
-                console.log('[LLM] Groq success');
+            console.log('[LLM] Arli AI response:', JSON.stringify(data).slice(0, 500));
+
+            if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+                console.log('[LLM] Arli AI success');
                 return parseJSON(data.choices[0].message.content);
             }
+
+            throw new Error('Arli AI returned empty content');
         } catch (err) {
-            console.error('[LLM] Groq failed:', err.message);
+            console.error('[LLM] Arli AI failed:', err.message);
+            throw err;
         }
     }
 
-    // Workers AI LLM — try multiple models
-    if (env.AI) {
-        const models = [
-            '@cf/meta/llama-3.2-3b-instruct',
-            '@cf/meta/llama-3.1-8b-instruct-fp8',
-            '@cf/meta/llama-3.1-8b-instruct',
-        ];
-
-        const errors = [];
-        for (const model of models) {
-            try {
-                console.log(`[LLM] Trying ${model}...`);
-                const response = await env.AI.run(model, {
-                    messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt }
-                    ],
-                    max_tokens: 4096,
-                    temperature: 0.3
-                });
-
-                console.log(`[LLM] ${model} raw:`, JSON.stringify(response).slice(0, 500));
-
-                // Extract text from various response formats
-                let text = null;
-                if (typeof response === 'string') {
-                    text = response;
-                } else if (response && typeof response.response === 'string') {
-                    text = response.response;
-                } else if (response && typeof response.response === 'object') {
-                    text = JSON.stringify(response.response);
-                } else if (response && response.choices && response.choices[0]) {
-                    text = response.choices[0].message?.content || JSON.stringify(response.choices[0]);
-                } else {
-                    text = JSON.stringify(response);
-                }
-
-                console.log(`[LLM] ${model} extracted text:`, text.slice(0, 300));
-
-                if (text) {
-                    return parseJSON(text);
-                }
-
-                errors.push(`${model}: empty response`);
-            } catch (err) {
-                console.error(`[LLM] ${model} failed:`, err.message);
-                errors.push(`${model}: ${err.message}`);
-            }
-        }
-
-        throw new Error(`AI-модели вернули ошибки:\n${errors.join('\n')}`);
-    }
-
-    throw new Error('Workers AI binding недоступен.');
+    throw new Error('ARLI_API_KEY не настроен.');
 }
 
 /**
