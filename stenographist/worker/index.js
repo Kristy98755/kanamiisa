@@ -188,8 +188,7 @@ async function transcribeAudio(audioFile, env) {
     console.log(`Transcribing: ${bytes.length} bytes, type: ${audioFile.type}`);
 
     const result = await env.AI.run('@cf/openai/whisper', {
-        audio: [...bytes],
-        language: 'ru'
+        audio: [...bytes]
     });
 
     console.log('Whisper result:', JSON.stringify(result).slice(0, 200));

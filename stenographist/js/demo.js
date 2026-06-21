@@ -212,21 +212,24 @@ async function workerProcess(audioBlob, onProgress) {
     let fullTranscript = '';
 
     if (needsChunking) {
-        const numChunks = Math.ceil(durationSec / CHUNK_DURATION);
-        console.log(`[Worker] Chunking into ${numChunks} pieces`);
+        // Find optimal chunk count: smallest n where duration/n <= 60
+        const MAX_CHUNK_SEC = 60;
+        let numChunks = 1;
+        while (durationSec / numChunks > MAX_CHUNK_SEC) {
+            numChunks++;
+        }
+        const chunkDuration = durationSec / numChunks;
+        console.log(`[Worker] Splitting ${durationSec.toFixed(1)}s into ${numChunks} chunks of ${chunkDuration.toFixed(1)}s`);
 
         for (let i = 0; i < numChunks; i++) {
-            const startSec = i * CHUNK_DURATION;
-            const endSec = Math.min((i + 1) * CHUNK_DURATION, durationSec);
-            const chunkDuration = endSec - startSec;
+            const startSec = i * chunkDuration;
+            const chunkPercent = Math.round(((i + 0.5) / numChunks) * 60);
+            onProgress(0, `Кодирование фрагмента ${i + 1}/${numChunks}...`, chunkPercent);
 
-            // Progress: 0-70% for transcription, 70-100% for LLM
-            const chunkProgress = Math.round(((i + 1) / numChunks) * 70);
-            onProgress(0, `Фрагмент ${i + 1}/${numChunks} — распознавание...`, chunkProgress);
-
-            // Encode chunk
             const chunkBlob = await encodeChunk(audioBuffer, startSec, chunkDuration);
             console.log(`[Worker] Chunk ${i + 1}: ${chunkBlob.size} bytes`);
+
+            onProgress(0, `Отправка фрагмента ${i + 1}/${numChunks}...`, Math.round(((i + 1) / numChunks) * 60));
 
             const formData = new FormData();
             formData.append('audio', chunkBlob, `chunk_${i}.webm`);
@@ -245,7 +248,7 @@ async function workerProcess(audioBlob, onProgress) {
             console.log(`[Worker] Chunk ${i + 1} transcript:`, result.transcript);
             fullTranscript += (fullTranscript ? ' ' : '') + result.transcript;
 
-            onProgress(1, `Распознано: ${countWords(fullTranscript)} слов (${i + 1}/${numChunks})`, chunkProgress);
+            onProgress(1, `Распознано: ${countWords(fullTranscript)} слов (${i + 1}/${numChunks})`, 60 + Math.round(((i + 1) / numChunks) * 10));
         }
 
         audioContext.close();
