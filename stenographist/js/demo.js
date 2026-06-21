@@ -258,6 +258,7 @@ async function handleSSEResponse(response, onProgress) {
 
                     if (event.type === 'progress') {
                         console.log(`[SSE] step=${event.step} ${event.detail} ${event.percent}%`);
+                        if (event.transcript) console.log('[SSE] Transcript:', event.transcript);
                         onProgress(event.step, event.detail, event.percent);
                     } else if (event.type === 'result') {
                         console.log('[SSE] Got result:', event.data);

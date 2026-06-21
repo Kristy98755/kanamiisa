@@ -98,7 +98,7 @@ function handleProcessSSE(audioFile, env) {
                 // Step 1: Transcribe
                 sendEvent({ type: 'progress', step: 0, detail: 'Отправка аудио...', percent: 5 });
                 const transcript = await transcribeAudio(audioFile, env);
-                sendEvent({ type: 'progress', step: 1, detail: `Речь распознана (${countWords(transcript)} слов)`, percent: 35 });
+                sendEvent({ type: 'progress', step: 1, detail: `Речь распознана (${countWords(transcript)} слов)`, percent: 35, transcript });
 
                 // Step 2: Generate medical history
                 sendEvent({ type: 'progress', step: 2, detail: 'Анализ текста...', percent: 45 });
@@ -360,18 +360,27 @@ async function generateMedicalHistory(transcript, env) {
         }
 
         const data = await response.json();
+        console.log('[LLM] Full response:', JSON.stringify(data).slice(0, 1000));
 
-        if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-            const content = data.choices[0].message.content;
-            console.log('[LLM] Arli AI raw content:', content);
+        const content = data.choices?.[0]?.message?.content;
+        const reasoning = data.choices?.[0]?.message?.reasoning;
+        const finishReason = data.choices?.[0]?.finish_reason;
+
+        console.log('[LLM] content:', content?.slice(0, 500));
+        console.log('[LLM] reasoning:', reasoning?.slice(0, 500));
+        console.log('[LLM] finish_reason:', finishReason);
+
+        const text = content || reasoning;
+        if (text) {
+            console.log('[LLM] Using text:', text.slice(0, 500));
 
             try {
-                return parseJSON(content);
+                return parseJSON(text);
             } catch (parseErr) {
                 console.error('[LLM] JSON parse failed:', parseErr.message);
                 // Throw with raw content attached for debugging
-                const err = new Error(`JSON parse error: ${parseErr.message}\n\n--- RAW LLM RESPONSE ---\n${content}`);
-                err.rawContent = content;
+                const err = new Error(`JSON parse error: ${parseErr.message}\n\n--- RAW LLM RESPONSE ---\n${text}`);
+                err.rawContent = text;
                 throw err;
             }
         }
