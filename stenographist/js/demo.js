@@ -4,7 +4,7 @@
  */
 
 const DEMO_CONFIG = {
-    WORKER_URL: 'https://stenographist.itismynickname9.workers.dev',
+    WORKER_URL: 'https://kanamiisa.itismynickname9.workers.dev',
     USE_DEMO: false,
 };
 
