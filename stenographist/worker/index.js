@@ -369,8 +369,8 @@ async function generateMedicalHistory(transcript, env) {
     if (env.AI) {
         const models = [
             '@cf/meta/llama-3.2-3b-instruct',
-            '@cf/meta/llama-3.1-8b-instruct',
-            '@cf/mistral/mistral-7b-instruct-v0.1',
+            '@cf/meta/llama-3.1-8b-instruct-fp8',
+            '@cf/mistral/mistral-7b-instruct-v0.2',
         ];
 
         for (const model of models) {
