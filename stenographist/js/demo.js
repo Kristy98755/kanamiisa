@@ -222,61 +222,31 @@ async function workerProcess(audioBlob, onProgress) {
             onProgress(0, `Загрузка ffmpeg: ${Math.round(p * 100)}%`, 3 + Math.round(p * 12));
         });
 
-        onProgress(0, 'Конвертация в WAV...', 15);
+        onProgress(0, 'Разбиение аудио...', 15);
         const inputData = new Uint8Array(arrayBuffer);
         const ext = audioBlob.type.includes('mp3') ? 'mp3' : 'webm';
         const inputName = `input.${ext}`;
         await ffmpeg.FS('writeFile', inputName, inputData);
-        await ffmpeg.run('-i', inputName, '-ar', '16000', '-ac', '1', '-f', 'wav', 'output.wav');
-        const wavData = await ffmpeg.FS('readFile', 'output.wav');
-        console.log(`[Worker] WAV size: ${wavData.length} bytes`);
-        try { ffmpeg.FS('unlink', inputName); } catch (e) {}
-        try { ffmpeg.FS('unlink', 'output.wav'); } catch (e) {}
-
-        const SAMPLE_RATE = 16000;
-        const BYTES_PER_SAMPLE = 2;
-        const bytesPerSec = SAMPLE_RATE * BYTES_PER_SAMPLE;
-        const headerSize = 44;
-        const pcmSize = wavData.length - headerSize;
-        const totalSamples = Math.floor(pcmSize / BYTES_PER_SAMPLE);
-        const samplesPerChunk = Math.floor(totalSamples / numChunks);
-
-        console.log(`[Worker] WAV: ${totalSamples} samples, ${samplesPerChunk} per chunk`);
 
         const chunkFiles = [];
         for (let i = 0; i < numChunks; i++) {
-            const startSample = i * samplesPerChunk;
-            const endSample = (i === numChunks - 1) ? totalSamples : (i + 1) * samplesPerChunk;
-            const chunkSamples = endSample - startSample;
-            const chunkPcmBytes = chunkSamples * BYTES_PER_SAMPLE;
-
-            const chunkWav = new Uint8Array(headerSize + chunkPcmBytes);
-            const view = new DataView(chunkWav.buffer);
-
-            const chunkDuration = chunkSamples / SAMPLE_RATE;
-            const chunkDataSize = chunkPcmBytes;
-
-            // RIFF header
-            chunkWav[0] = 0x52; chunkWav[1] = 0x49; chunkWav[2] = 0x46; chunkWav[3] = 0x46; // "RIFF"
-            view.setUint32(4, 36 + chunkDataSize, true);
-            chunkWav[8] = 0x57; chunkWav[9] = 0x41; chunkWav[10] = 0x56; chunkWav[11] = 0x45; // "WAVE"
-            chunkWav[12] = 0x66; chunkWav[13] = 0x6D; chunkWav[14] = 0x74; chunkWav[15] = 0x20; // "fmt "
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, 1, true);
-            view.setUint32(24, SAMPLE_RATE, true);
-            view.setUint32(28, SAMPLE_RATE * BYTES_PER_SAMPLE, true);
-            view.setUint16(32, BYTES_PER_SAMPLE, true);
-            view.setUint16(34, BYTES_PER_SAMPLE * 8, true);
-            chunkWav[36] = 0x64; chunkWav[37] = 0x61; chunkWav[38] = 0x74; chunkWav[39] = 0x61; // "data"
-            view.setUint32(40, chunkDataSize, true);
-
-            const pcmStart = headerSize + startSample * BYTES_PER_SAMPLE;
-            chunkWav.set(wavData.slice(pcmStart, pcmStart + chunkPcmBytes), headerSize);
-
-            chunkFiles.push({ name: `chunk_${i}.wav`, data: chunkWav, duration: chunkDuration });
-            console.log(`[Worker] Chunk ${i}: ${chunkDuration.toFixed(1)}s, ${chunkWav.length} bytes`);
+            const startSec = i * segmentTime;
+            const outName = `chunk_${i}.wav`;
+            await ffmpeg.run(
+                '-ss', String(startSec),
+                '-i', inputName,
+                '-t', String(segmentTime),
+                '-ar', '16000',
+                '-ac', '1',
+                '-y',
+                outName
+            );
+            const data = await ffmpeg.FS('readFile', outName);
+            chunkFiles.push({ name: outName, data: new Uint8Array(data), duration: segmentTime });
+            try { ffmpeg.FS('unlink', outName); } catch (e) {}
+            console.log(`[Worker] Chunk ${i}: ${segmentTime}s, ${data.length} bytes`);
         }
+        try { ffmpeg.FS('unlink', inputName); } catch (e) {}
 
         console.log(`[Worker] Created ${chunkFiles.length} WAV chunks`);
         onProgress(0, `Получено ${chunkFiles.length} фрагментов`, 18);
