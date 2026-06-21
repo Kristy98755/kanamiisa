@@ -30,6 +30,16 @@ export default {
             });
         }
 
+        // Health / diagnostics
+        if (request.method === 'GET' && url.pathname === '/health') {
+            return jsonResponse({
+                ok: true,
+                hasAI: !!env.AI,
+                hasGROQ: !!env.GROQ_API_KEY,
+                timestamp: new Date().toISOString()
+            }, 200, env);
+        }
+
         // Only POST /process is supported
         if (request.method === 'POST' && url.pathname === '/process') {
             return handleProcess(request, env);
@@ -140,49 +150,27 @@ async function processFull(audioFile, env) {
  * with an external free API (e.g., Deepgram, AssemblyAI free tier).
  */
 async function transcribeAudio(audioFile, env) {
-    // Method 1: Cloudflare Workers AI (Whisper)
-    if (env.AI) {
-        try {
-            const audioBuffer = await audioFile.arrayBuffer();
-            const result = await env.AI.run('@cf/openai/whisper', {
-                audio: [...new Uint8Array(audioBuffer)]
-            });
-
-            if (result && result.text) {
-                return result.text;
-            }
-        } catch (err) {
-            console.warn('Workers AI Whisper failed, trying fallback:', err.message);
-        }
+    if (!env.AI) {
+        throw new Error('Workers AI binding not available');
     }
 
-    // Method 2: Fallback — use external free API
-    // Uncomment and configure one of the following:
+    const audioBuffer = await audioFile.arrayBuffer();
+    const audioArray = [...new Uint8Array(audioBuffer)];
 
-    /*
-    // Option A: Deepgram (free tier: 200 minutes/month)
-    const DEEPGRAM_API_KEY = env.DEEPGRAM_API_KEY;
-    if (DEEPGRAM_API_KEY) {
-        const audioBuffer = await audioFile.arrayBuffer();
-        const response = await fetch(
-            'https://api.deepgram.com/v1/listen?model=nova&language=ru',
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Token ${DEEPGRAM_API_KEY}`,
-                    'Content-Type': audioFile.type || 'audio/webm'
-                },
-                body: audioBuffer
-            }
-        );
-        const data = await response.json();
-        if (data.results && data.results.channels && data.results.channels[0]) {
-            return data.results.channels[0].alternatives[0].transcript;
-        }
+    console.log(`Transcribing: ${audioArray.length} bytes`);
+
+    const result = await Promise.race([
+        env.AI.run('@cf/openai/whisper', { audio: audioArray }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Whisper timeout (30s)')), 30000))
+    ]);
+
+    console.log('Whisper result:', JSON.stringify(result).slice(0, 200));
+
+    if (result && result.text) {
+        return result.text;
     }
-    */
 
-    throw new Error('Speech-to-text service not configured. Enable Workers AI binding or add external API key.');
+    throw new Error('Whisper returned empty result');
 }
 
 // ============================================================
@@ -344,14 +332,20 @@ async function generateMedicalHistory(transcript, env) {
     // Workers AI LLM (free tier)
     if (env.AI) {
         try {
-            const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                max_tokens: 4096,
-                temperature: 0.3
-            });
+            console.log('Calling Workers AI LLM...');
+            const response = await Promise.race([
+                env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ],
+                    max_tokens: 4096,
+                    temperature: 0.3
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('LLM timeout (60s)')), 60000))
+            ]);
+
+            console.log('LLM response:', JSON.stringify(response).slice(0, 300));
 
             if (response && response.response) {
                 return parseJSON(response.response);

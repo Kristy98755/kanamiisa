@@ -205,6 +205,7 @@ async function workerProcess(audioBlob, onProgress) {
     try {
         const response = await fetch(sseUrl, {
             method: 'POST',
+            headers: { 'Accept': 'text/event-stream' },
             body: formData
         });
 
