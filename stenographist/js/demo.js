@@ -256,17 +256,20 @@ async function workerProcess(audioBlob, onProgress) {
             const chunkDuration = chunkSamples / SAMPLE_RATE;
             const chunkDataSize = chunkPcmBytes;
 
+            // RIFF header
+            chunkWav[0] = 0x52; chunkWav[1] = 0x49; chunkWav[2] = 0x46; chunkWav[3] = 0x46; // "RIFF"
             view.setUint32(4, 36 + chunkDataSize, true);
-            view.setUint32(12, 1, true);
-            view.setUint32(16, 1, true);
-            view.setUint32(20, SAMPLE_RATE, true);
-            view.setUint32(24, SAMPLE_RATE * BYTES_PER_SAMPLE, true);
-            view.setUint16(28, BYTES_PER_SAMPLE, true);
-            view.setUint16(32, BYTES_PER_SAMPLE * 8, true);
-            view.setUint32(36, chunkDataSize, true);
-            chunkWav.set(new TextEncoder().encode('RIFF'), 0);
-            chunkWav.set(new TextEncoder().encode('WAVEfmt '), 0);
-            chunkWav.set(new TextEncoder().encode('data'), 36);
+            chunkWav[8] = 0x57; chunkWav[9] = 0x41; chunkWav[10] = 0x56; chunkWav[11] = 0x45; // "WAVE"
+            chunkWav[12] = 0x66; chunkWav[13] = 0x6D; chunkWav[14] = 0x74; chunkWav[15] = 0x20; // "fmt "
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, SAMPLE_RATE, true);
+            view.setUint32(28, SAMPLE_RATE * BYTES_PER_SAMPLE, true);
+            view.setUint16(32, BYTES_PER_SAMPLE, true);
+            view.setUint16(34, BYTES_PER_SAMPLE * 8, true);
+            chunkWav[36] = 0x64; chunkWav[37] = 0x61; chunkWav[38] = 0x74; chunkWav[39] = 0x61; // "data"
+            view.setUint32(40, chunkDataSize, true);
 
             const pcmStart = headerSize + startSample * BYTES_PER_SAMPLE;
             chunkWav.set(wavData.slice(pcmStart, pcmStart + chunkPcmBytes), headerSize);
