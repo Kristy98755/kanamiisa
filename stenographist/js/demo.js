@@ -220,9 +220,11 @@ async function workerProcess(audioBlob, onProgress) {
             const endSec = Math.min((i + 1) * CHUNK_DURATION, durationSec);
             const chunkDuration = endSec - startSec;
 
-            onProgress(0, `Фрагмент ${i + 1}/${numChunks} (${startSec.toFixed(0)}-${endSec.toFixed(0)}с)...`, Math.round((i / numChunks) * 30));
+            // Progress: 0-70% for transcription, 70-100% for LLM
+            const chunkProgress = Math.round(((i + 1) / numChunks) * 70);
+            onProgress(0, `Фрагмент ${i + 1}/${numChunks} — распознавание...`, chunkProgress);
 
-            // Encode chunk via MediaRecorder
+            // Encode chunk
             const chunkBlob = await encodeChunk(audioBuffer, startSec, chunkDuration);
             console.log(`[Worker] Chunk ${i + 1}: ${chunkBlob.size} bytes`);
 
@@ -243,12 +245,12 @@ async function workerProcess(audioBlob, onProgress) {
             console.log(`[Worker] Chunk ${i + 1} transcript:`, result.transcript);
             fullTranscript += (fullTranscript ? ' ' : '') + result.transcript;
 
-            onProgress(1, `Распознано: ${countWords(fullTranscript)} слов (${i + 1}/${numChunks})`, 30);
+            onProgress(1, `Распознано: ${countWords(fullTranscript)} слов (${i + 1}/${numChunks})`, chunkProgress);
         }
 
         audioContext.close();
     } else {
-        onProgress(0, 'Отправка аудио...', 5);
+        onProgress(0, 'Распознавание речи...', 10);
 
         const formData = new FormData();
         formData.append('audio', audioBlob, 'recording.webm');
@@ -269,10 +271,10 @@ async function workerProcess(audioBlob, onProgress) {
     }
 
     console.log(`[Worker] Full transcript (${countWords(fullTranscript)} words):`, fullTranscript);
-    onProgress(1, `Речь распознана (${countWords(fullTranscript)} слов)`, 35);
+    onProgress(1, `Речь распознана (${countWords(fullTranscript)} слов)`, 70);
 
     // Step 2: Generate medical history
-    onProgress(2, 'Анализ текста...', 45);
+    onProgress(2, 'Генерация истории болезни...', 75);
 
     const formData = new FormData();
     formData.append('transcript', fullTranscript);
@@ -306,10 +308,10 @@ function encodeChunk(audioBuffer, startSec, durationSec) {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const source = ctx.createBufferSource();
         source.buffer = audioBuffer;
-        source.connect(ctx.destination);
 
         const dest = ctx.createMediaStreamDestination();
         source.connect(dest);
+        // Do NOT connect to ctx.destination — that plays audio through speakers
 
         const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
             ? 'audio/webm;codecs=opus'
@@ -330,8 +332,7 @@ function encodeChunk(audioBuffer, startSec, durationSec) {
         recorder.start();
         source.start(0, startSec, durationSec);
 
-        // Stop after chunk duration + small buffer
-        setTimeout(() => recorder.stop(), (durationSec + 0.1) * 1000);
+        setTimeout(() => recorder.stop(), (durationSec + 0.5) * 1000);
     });
 }
 
