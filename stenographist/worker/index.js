@@ -370,7 +370,7 @@ async function generateMedicalHistory(transcript, env) {
         const models = [
             '@cf/meta/llama-3.2-3b-instruct',
             '@cf/meta/llama-3.1-8b-instruct-fp8',
-            '@cf/mistral/mistral-7b-instruct-v0.2',
+            '@cf/meta/llama-3.1-8b-instruct',
         ];
 
         const errors = [];
@@ -388,16 +388,29 @@ async function generateMedicalHistory(transcript, env) {
 
                 console.log(`[LLM] ${model} raw:`, JSON.stringify(response).slice(0, 500));
 
-                if (response && response.response) {
-                    console.log(`[LLM] ${model} success`);
-                    return parseJSON(response.response);
+                // Extract text from various response formats
+                let text = null;
+                if (typeof response === 'string') {
+                    text = response;
+                } else if (response && typeof response.response === 'string') {
+                    text = response.response;
+                } else if (response && typeof response.response === 'object') {
+                    text = JSON.stringify(response.response);
+                } else if (response && response.choices && response.choices[0]) {
+                    text = response.choices[0].message?.content || JSON.stringify(response.choices[0]);
+                } else {
+                    text = JSON.stringify(response);
                 }
 
-                const detail = response ? JSON.stringify(response).slice(0, 200) : 'empty response';
-                console.warn(`[LLM] ${model} no .response field:`, detail);
-                errors.push(`${model}: no response field (${detail})`);
+                console.log(`[LLM] ${model} extracted text:`, text.slice(0, 300));
+
+                if (text) {
+                    return parseJSON(text);
+                }
+
+                errors.push(`${model}: empty response`);
             } catch (err) {
-                console.error(`[LLM] ${model} failed:`, err.message, err.stack);
+                console.error(`[LLM] ${model} failed:`, err.message);
                 errors.push(`${model}: ${err.message}`);
             }
         }
@@ -412,7 +425,10 @@ async function generateMedicalHistory(transcript, env) {
  * Parse JSON from AI response, handling markdown code blocks.
  */
 function parseJSON(text) {
-    // Strip markdown code block if present
+    if (!text || typeof text !== 'string') {
+        throw new Error(`parseJSON: expected string, got ${typeof text}`);
+    }
+
     let cleaned = text.trim();
     if (cleaned.startsWith('```json')) {
         cleaned = cleaned.slice(7);
@@ -427,12 +443,11 @@ function parseJSON(text) {
     try {
         return JSON.parse(cleaned);
     } catch (e) {
-        // Try to find JSON object in the text
         const match = cleaned.match(/\{[\s\S]*\}/);
         if (match) {
             return JSON.parse(match[0]);
         }
-        throw new Error('Failed to parse AI response as JSON');
+        throw new Error(`Failed to parse AI response as JSON: ${cleaned.slice(0, 200)}`);
     }
 }
 
