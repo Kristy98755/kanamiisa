@@ -373,6 +373,7 @@ async function generateMedicalHistory(transcript, env) {
             '@cf/mistral/mistral-7b-instruct-v0.2',
         ];
 
+        const errors = [];
         for (const model of models) {
             try {
                 console.log(`[LLM] Trying ${model}...`);
@@ -385,21 +386,26 @@ async function generateMedicalHistory(transcript, env) {
                     temperature: 0.3
                 });
 
-                console.log(`[LLM] ${model} response:`, JSON.stringify(response).slice(0, 300));
+                console.log(`[LLM] ${model} raw:`, JSON.stringify(response).slice(0, 500));
 
                 if (response && response.response) {
                     console.log(`[LLM] ${model} success`);
                     return parseJSON(response.response);
                 }
 
-                console.warn(`[LLM] ${model} returned empty response`);
+                const detail = response ? JSON.stringify(response).slice(0, 200) : 'empty response';
+                console.warn(`[LLM] ${model} no .response field:`, detail);
+                errors.push(`${model}: no response field (${detail})`);
             } catch (err) {
-                console.error(`[LLM] ${model} failed:`, err.message);
+                console.error(`[LLM] ${model} failed:`, err.message, err.stack);
+                errors.push(`${model}: ${err.message}`);
             }
         }
+
+        throw new Error(`AI-модели вернули ошибки:\n${errors.join('\n')}`);
     }
 
-    throw new Error('Не удалось сгенерировать историю болезни. AI-модели недоступны.');
+    throw new Error('Workers AI binding недоступен.');
 }
 
 /**
