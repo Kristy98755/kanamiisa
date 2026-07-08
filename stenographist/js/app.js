@@ -98,6 +98,7 @@
         try {
             const res = await fetch('/stenographist/api/session');
             const data = await res.json();
+            console.log('[Admin] session check:', data);
             if (data.valid && data.role === 'root') {
                 const btn = document.createElement('a');
                 btn.href = '/stenographist/panel.html';
