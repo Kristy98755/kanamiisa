@@ -1,70 +1,439 @@
+/**
+ * Cloudflare Worker — Stenographist Backend
+ *
+ * Handles:
+ * 1. Session management (create, validate, kill)
+ * 2. Event tracking (page_view, heartbeat, login_attempt, logout)
+ * 3. Fingerprint storage
+ * 4. Auth (login/logout)
+ * 5. Audio upload → Speech-to-text → Medical history
+ *
+ * KV Namespace: AUTH_KV
+ *   session:{session_id} → session data
+ *   failed:{session_id} → brute force counter (TTL 1 hour)
+ */
+
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
+        const path = url.pathname;
 
+        // CORS preflight
         if (request.method === 'OPTIONS') {
-            return new Response(null, { status: 204, headers: corsHeaders() });
+            return new Response(null, {
+                status: 204,
+                headers: corsHeaders(env)
+            });
         }
 
-        if (request.method === 'GET' && url.pathname === '/health') {
-            return jsonResponse({ ok: true }, 200);
+        // --- Session & Event endpoints (no auth required) ---
+        if (request.method === 'POST' && path === '/stenographist/api/event') {
+            return handleEvent(request, env);
+        }
+        if (request.method === 'POST' && path === '/stenographist/api/fingerprint') {
+            return handleFingerprint(request, env);
+        }
+        if (request.method === 'POST' && path === '/stenographist/api/auth') {
+            return handleAuth(request, env);
+        }
+        if (request.method === 'POST' && path === '/stenographist/api/logout') {
+            return handleLogout(request, env);
+        }
+        if (request.method === 'GET' && path === '/stenographist/api/session') {
+            return handleGetSession(request, env);
         }
 
-        if (request.method === 'POST' && url.pathname === '/process') {
+        // --- Admin endpoints (auth required) ---
+        if (request.method === 'GET' && path === '/stenographist/api/sessions') {
+            return handleGetSessions(request, env);
+        }
+        if (request.method === 'POST' && path === '/stenographist/api/session/kill') {
+            return handleKillSession(request, env);
+        }
+
+        // --- Audio processing (auth required) ---
+        if (request.method === 'POST' && path === '/stenographist/api/process') {
             return handleProcess(request, env);
         }
 
-        return jsonResponse({ error: 'Not found' }, 404);
+        return jsonResponse({ error: 'Not found' }, 404, env);
     }
 };
 
+// ============================================================
+// Session Management
+// ============================================================
+
+function getSessionId(request) {
+    const cookie = request.headers.get('Cookie') || '';
+    const match = cookie.match(/session_id=([^;]+)/);
+    return match ? match[1] : null;
+}
+
+function getIp(request) {
+    return request.headers.get('CF-Connecting-IP') || 'unknown';
+}
+
+function getCountry(request) {
+    return request.headers.get('CF-IPCountry') || 'unknown';
+}
+
+function getUserAgent(request) {
+    return request.headers.get('User-Agent') || 'unknown';
+}
+
+// --- Event endpoint ---
+async function handleEvent(request, env) {
+    try {
+        const body = await request.json();
+        const { session_id, type, path, timestamp, success, username } = body;
+
+        if (!session_id || !type) {
+            return jsonResponse({ error: 'Missing session_id or type' }, 400, env);
+        }
+
+        const ip = getIp(request);
+        const country = getCountry(request);
+
+        // Get or create session
+        let session = await env.AUTH_KV.get(`session:${session_id}`, 'json');
+
+        if (!session) {
+            // New session
+            session = {
+                id: session_id,
+                created: new Date(timestamp).toISOString(),
+                lastSeen: new Date(timestamp).toISOString(),
+                ip,
+                country,
+                userAgent: getUserAgent(request),
+                username: null,
+                failedAttempts: 0,
+                events: []
+            };
+        } else {
+            // Update lastSeen
+            session.lastSeen = new Date(timestamp).toISOString();
+        }
+
+        // Add event
+        session.events.push({
+            type,
+            ts: new Date(timestamp).toISOString(),
+            path: path || null,
+            success: success !== undefined ? success : null,
+            username: username || null
+        });
+
+        // Keep only last 100 events
+        if (session.events.length > 100) {
+            session.events = session.events.slice(-100);
+        }
+
+        // Save session (TTL 1 hour)
+        await env.AUTH_KV.put(
+            `session:${session_id}`,
+            JSON.stringify(session),
+            { expirationTtl: 3600 }
+        );
+
+        return jsonResponse({ ok: true, session_id }, 200, env);
+    } catch (err) {
+        console.error('Event error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
+}
+
+// --- Fingerprint endpoint ---
+async function handleFingerprint(request, env) {
+    try {
+        const { session_id, fingerprint } = await request.json();
+
+        if (!session_id || !fingerprint) {
+            return jsonResponse({ error: 'Missing session_id or fingerprint' }, 400, env);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${session_id}`, 'json');
+        if (!session) {
+            return jsonResponse({ error: 'Session not found' }, 404, env);
+        }
+
+        session.fingerprint = fingerprint;
+        await env.AUTH_KV.put(
+            `session:${session_id}`,
+            JSON.stringify(session),
+            { expirationTtl: 3600 }
+        );
+
+        return jsonResponse({ ok: true }, 200, env);
+    } catch (err) {
+        console.error('Fingerprint error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
+}
+
+// --- Auth endpoint ---
+async function handleAuth(request, env) {
+    try {
+        const { username, password } = await request.json();
+        const sessionId = getSessionId(request);
+
+        if (!username || !password) {
+            return jsonResponse({ error: 'Missing username or password' }, 400, env);
+        }
+
+        if (!sessionId) {
+            return jsonResponse({ error: 'No session' }, 401, env);
+        }
+
+        // Check brute force
+        const failedKey = `failed:${sessionId}`;
+        const failedCount = await env.AUTH_KV.get(failedKey);
+        if (failedCount && parseInt(failedCount) >= 10) {
+            return jsonResponse({ error: 'Слишком много попыток. Попробуйте через 15 минут.' }, 429, env);
+        }
+
+        // Validate credentials (hardcoded for demo)
+        const validUsers = {
+            'kanamiisa': { password: 'kanamiisa', role: 'root' }
+        };
+
+        const user = validUsers[username];
+
+        if (!user || user.password !== password) {
+            // Increment failed attempts
+            const current = failedCount ? parseInt(failedCount) : 0;
+            await env.AUTH_KV.put(failedKey, (current + 1).toString(), { expirationTtl: 3600 });
+
+            return jsonResponse({ error: 'Неправильный логин или пароль' }, 401, env);
+        }
+
+        // Success — clear failed attempts
+        await env.AUTH_KV.delete(failedKey);
+
+        // Update session with username
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (session) {
+            session.username = username;
+            session.role = user.role;
+            await env.AUTH_KV.put(
+                `session:${sessionId}`,
+                JSON.stringify(session),
+                { expirationTtl: 3600 }
+            );
+
+            // Add to user's session list
+            const listKey = `session_list:${username}`;
+            const list = await env.AUTH_KV.get(listKey, 'json') || [];
+            if (!list.includes(sessionId)) {
+                list.push(sessionId);
+                await env.AUTH_KV.put(listKey, JSON.stringify(list), { expirationTtl: 3600 });
+            }
+        }
+
+        return jsonResponse({ ok: true, username, role: user.role }, 200, env);
+    } catch (err) {
+        console.error('Auth error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
+}
+
+// --- Logout endpoint ---
+async function handleLogout(request, env) {
+    try {
+        const sessionId = getSessionId(request);
+        if (!sessionId) {
+            return jsonResponse({ ok: true }, 200, env);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (session && session.username) {
+            // Remove from user's session list
+            const listKey = `session_list:${session.username}`;
+            const list = await env.AUTH_KV.get(listKey, 'json') || [];
+            const newList = list.filter(id => id !== sessionId);
+            if (newList.length > 0) {
+                await env.AUTH_KV.put(listKey, JSON.stringify(newList), { expirationTtl: 3600 });
+            } else {
+                await env.AUTH_KV.delete(listKey);
+            }
+        }
+
+        // Delete session
+        await env.AUTH_KV.delete(`session:${sessionId}`);
+        await env.AUTH_KV.delete(`failed:${sessionId}`);
+
+        return jsonResponse({ ok: true }, 200, env);
+    } catch (err) {
+        console.error('Logout error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
+}
+
+// --- Get session endpoint ---
+async function handleGetSession(request, env) {
+    try {
+        const sessionId = getSessionId(request);
+        if (!sessionId) {
+            return jsonResponse({ valid: false }, 200, env);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (!session) {
+            return jsonResponse({ valid: false }, 200, env);
+        }
+
+        return jsonResponse({
+            valid: true,
+            session_id: session.id,
+            created: session.created,
+            lastSeen: session.lastSeen,
+            username: session.username,
+            role: session.role,
+            failedAttempts: session.failedAttempts || 0
+        }, 200, env);
+    } catch (err) {
+        console.error('GetSession error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
+}
+
+// --- Get sessions (admin) ---
+async function handleGetSessions(request, env) {
+    try {
+        const sessionId = getSessionId(request);
+        if (!sessionId) {
+            return jsonResponse({ error: 'No session' }, 401, env);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (!session || session.role !== 'root') {
+            return jsonResponse({ error: 'Forbidden' }, 403, env);
+        }
+
+        // List all sessions
+        const list = await env.AUTH_KV.list({ prefix: 'session:' });
+        const sessions = [];
+
+        for (const key of list.keys) {
+            if (key.name === `session:${sessionId}`) continue; // Skip self
+
+            const s = await env.AUTH_KV.get(key.name, 'json');
+            if (s) {
+                // Check if active (lastSeen within 2 minutes)
+                const lastSeen = new Date(s.lastSeen).getTime();
+                const isActive = (Date.now() - lastSeen) < 120000;
+
+                sessions.push({
+                    session_id: s.id,
+                    username: s.username,
+                    ip: s.ip,
+                    country: s.country,
+                    userAgent: s.userAgent,
+                    lastSeen: s.lastSeen,
+                    created: s.created,
+                    failedAttempts: s.failedAttempts || 0,
+                    active: isActive,
+                    incognito: s.fingerprint?.incognito || false
+                });
+            }
+        }
+
+        return jsonResponse({ sessions }, 200, env);
+    } catch (err) {
+        console.error('GetSessions error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
+}
+
+// --- Kill session (admin) ---
+async function handleKillSession(request, env) {
+    try {
+        const adminSessionId = getSessionId(request);
+        if (!adminSessionId) {
+            return jsonResponse({ error: 'No session' }, 401, env);
+        }
+
+        const adminSession = await env.AUTH_KV.get(`session:${adminSessionId}`, 'json');
+        if (!adminSession || adminSession.role !== 'root') {
+            return jsonResponse({ error: 'Forbidden' }, 403, env);
+        }
+
+        const { session_id } = await request.json();
+        if (!session_id) {
+            return jsonResponse({ error: 'Missing session_id' }, 400, env);
+        }
+
+        const targetSession = await env.AUTH_KV.get(`session:${session_id}`, 'json');
+        if (!targetSession) {
+            return jsonResponse({ error: 'Session not found' }, 404, env);
+        }
+
+        // Remove from user's session list
+        if (targetSession.username) {
+            const listKey = `session_list:${targetSession.username}`;
+            const list = await env.AUTH_KV.get(listKey, 'json') || [];
+            const newList = list.filter(id => id !== session_id);
+            if (newList.length > 0) {
+                await env.AUTH_KV.put(listKey, JSON.stringify(newList), { expirationTtl: 3600 });
+            } else {
+                await env.AUTH_KV.delete(listKey);
+            }
+        }
+
+        // Delete session
+        await env.AUTH_KV.delete(`session:${session_id}`);
+        await env.AUTH_KV.delete(`failed:${session_id}`);
+
+        return jsonResponse({ ok: true }, 200, env);
+    } catch (err) {
+        console.error('KillSession error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
+}
+
+// ============================================================
+// Audio Processing
+// ============================================================
+
 async function handleProcess(request, env) {
-    const url = new URL(request.url);
-    const mode = url.searchParams.get('mode') || 'full';
+    const headers = corsHeaders(env);
 
     try {
         const formData = await request.formData();
         const audioFile = formData.get('audio');
-        const transcriptText = formData.get('transcript');
+
+        if (!audioFile) {
+            return jsonResponse({ error: 'No audio file provided' }, 400, env);
+        }
 
         const accept = request.headers.get('accept') || '';
         const useSSE = accept.includes('text/event-stream');
 
-        if (mode === 'transcribe') {
-            if (!audioFile) return jsonResponse({ error: 'No audio file provided' }, 400);
-            const transcript = await transcribeAudio(audioFile, env);
-            return jsonResponse({ transcript }, 200);
+        if (useSSE) {
+            return handleProcessSSE(audioFile, env);
         }
-
-        if (mode === 'generate') {
-            if (!transcriptText) return jsonResponse({ error: 'No transcript provided' }, 400);
-            const medicalHistory = await generateMedicalHistory(transcriptText, env);
-            return jsonResponse({ transcript: transcriptText, medicalHistory }, 200);
-        }
-
-        if (!audioFile) return jsonResponse({ error: 'No audio file provided' }, 400);
-
-        if (useSSE) return handleProcessSSE(audioFile, env);
 
         return await processFull(audioFile, env);
     } catch (err) {
-        return jsonResponse({ error: err.message }, 500);
+        console.error('Process error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
     }
 }
 
 function handleProcessSSE(audioFile, env) {
     const encoder = new TextEncoder();
-    const headers = corsHeaders();
     const stream = new ReadableStream({
         async start(controller) {
             function sendEvent(data) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+                const payload = `data: ${JSON.stringify(data)}\n\n`;
+                controller.enqueue(encoder.encode(payload));
             }
 
             try {
                 sendEvent({ type: 'progress', step: 0, detail: 'Отправка аудио...', percent: 5 });
                 const transcript = await transcribeAudio(audioFile, env);
-                sendEvent({ type: 'progress', step: 1, detail: 'Речь распознана', percent: 35, transcript });
+                sendEvent({ type: 'progress', step: 1, detail: `Речь распознана (${countWords(transcript)} слов)`, percent: 35 });
 
                 sendEvent({ type: 'progress', step: 2, detail: 'Анализ текста...', percent: 45 });
                 const medicalHistory = await generateMedicalHistory(transcript, env);
@@ -72,6 +441,7 @@ function handleProcessSSE(audioFile, env) {
 
                 sendEvent({ type: 'progress', step: 3, detail: 'Готово', percent: 100 });
                 sendEvent({ type: 'result', data: { transcript, medicalHistory } });
+
             } catch (err) {
                 sendEvent({ type: 'error', message: err.message });
             }
@@ -81,51 +451,38 @@ function handleProcessSSE(audioFile, env) {
     });
 
     return new Response(stream, {
-        headers: { ...headers, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' }
+        headers: {
+            ...headers,
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+        }
     });
 }
 
 async function processFull(audioFile, env) {
     const transcript = await transcribeAudio(audioFile, env);
     const medicalHistory = await generateMedicalHistory(transcript, env);
-    return jsonResponse({ transcript, medicalHistory }, 200);
+    return jsonResponse({ transcript, medicalHistory }, 200, env);
 }
 
 async function transcribeAudio(audioFile, env) {
-    if (!env.AI) throw new Error('Workers AI binding not available');
+    if (env.AI) {
+        try {
+            const audioBuffer = await audioFile.arrayBuffer();
+            const result = await env.AI.run('@cf/openai/whisper', {
+                audio: [...new Uint8Array(audioBuffer)]
+            });
 
-    const audioBuffer = await audioFile.arrayBuffer();
-    const bytes = new Uint8Array(audioBuffer);
-
-    if (!validateAudioBytes(bytes)) {
-        throw new Error('Файл не является аудио.');
+            if (result && result.text) {
+                return result.text;
+            }
+        } catch (err) {
+            console.warn('Workers AI Whisper failed:', err.message);
+        }
     }
 
-    let base64 = '';
-    for (let i = 0; i < bytes.length; i += 8192) {
-        base64 += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
-    }
-    base64 = btoa(base64);
-
-    const result = await env.AI.run('@cf/openai/whisper-large-v3-turbo', {
-        audio: base64,
-        language: 'ru'
-    });
-
-    if (result && result.text) return result.text;
-    throw new Error('Распознавание не вернуло результат.');
-}
-
-function validateAudioBytes(bytes) {
-    if (bytes.length < 12) return false;
-    if (bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3) return true;
-    if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return true;
-    if (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) return true;
-    if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) return true;
-    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) return true;
-    if (bytes.length > 8 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) return true;
-    if (bytes[0] === 0x66 && bytes[1] === 0x4C && bytes[2] === 0x61 && bytes[3] === 0x43) return true;
-    return false;
+    throw new Error('Speech-to-text service not configured.');
 }
 
 async function generateMedicalHistory(transcript, env) {
@@ -134,99 +491,171 @@ async function generateMedicalHistory(transcript, env) {
 Верни ТОЛЬКО валидный JSON без markdown и комментариев по этой схеме:
 
 {
-    "passport": { "fio": "ФИО", "dob": "Дата рождения", "age": "Возраст", "gender": "Пол", "address": "Адрес", "admissionDate": "Дата и время поступления", "dischargeDate": "", "referredBy": "Кем направлен", "department": "Отделение" },
-    "diagnosis": { "admission": "Диагноз при поступлении", "main": "Основной диагноз (МКБ если можно)", "complications": "Осложнения", "comorbidities": "Сопутствующие заболевания" },
-    "complaints": "Жалобы",
-    "anamnesis": "Анамнез заболевания",
-    "lifeAnamnesis": { "pastDiseases": "Перенесённые заболевания", "surgeries": "Операции", "traumas": "Травмы", "chronicDiseases": "Хронические заболевания", "allergies": "Аллергические реакции", "badHabits": "Вредные привычки", "heredity": "Наследственность" },
-    "status": { "generalState": "", "consciousness": "", "position": "", "temperature": "", "height": "", "weight": "", "bmi": "" },
-    "skin": { "color": "", "rash": "", "moisture": "", "turgor": "", "mucous": "" },
-    "lymphNodes": "",
-    "respiratory": { "respRate": "", "nasalBreathing": "", "percussion": "", "auscultation": "", "wheezes": "", "dyspnea": "", "spo2": "" },
-    "cardiovascular": { "bp": "", "pulse": "", "heartBorders": "", "heartTones": "", "murmurs": "", "edema": "" },
-    "digestive": { "tongue": "", "abdomen": "", "liver": "", "spleen": "", "stool": "" },
-    "urinary": { "urination": "", "punchingSymptom": "", "urEdema": "" },
-    "nervous": { "consciousness": "", "orientation": "", "meningeal": "", "focalSymptoms": "" },
-    "labResults": { "cbc": "", "urinalysis": "", "biochemistry": "", "xray": "", "ct": "", "ecg": "", "otherStudies": "" },
-    "diagnosisRationale": "Обоснование диагноза"
+    "passport": {
+        "fio": "ФИО",
+        "dob": "Дата рождения",
+        "age": "Возраст",
+        "gender": "Пол",
+        "address": "Адрес",
+        "admissionDate": "Дата и время поступления",
+        "dischargeDate": "Дата и время выписки (пустая строка если неизвестно)",
+        "referredBy": "Кем направлен",
+        "department": "Отделение"
+    },
+    "diagnosis": {
+        "admission": "Диагноз при поступлении",
+        "main": "Основной клинический диагноз (МКБ-код если можно определить)",
+        "complications": "Осложнения",
+        "comorbidities": "Сопутствующие заболевания"
+    },
+    "complaints": "Жалобы при поступлении (свободный текст)",
+    "anamnesis": "Анамнез заболевания — история текущей болезни",
+    "lifeAnamnesis": {
+        "pastDiseases": "Перенесённые заболевания",
+        "surgeries": "Операции",
+        "traumas": "Травмы",
+        "chronicDiseases": "Хронические заболевания",
+        "allergies": "Аллергические реакции",
+        "badHabits": "Вредные привычки",
+        "heredity": "Наследственность"
+    },
+    "status": {
+        "generalState": "Общее состояние",
+        "consciousness": "Сознание",
+        "position": "Положение",
+        "temperature": "Температура",
+        "height": "Рост",
+        "weight": "Вес",
+        "bmi": "ИМТ"
+    },
+    "skin": {
+        "color": "Окраска кожи",
+        "rash": "Сыпь",
+        "moisture": "Влажность",
+        "turgor": "Тургор",
+        "mucous": "Состояние слизистых"
+    },
+    "lymphNodes": "Периферические лимфоузлы",
+    "respiratory": {
+        "respRate": "ЧДД",
+        "nasalBreathing": "Носовое дыхание",
+        "percussion": "Перкуторный звук",
+        "auscultation": "Аускультативная картина",
+        "wheezes": "Хрипы",
+        "dyspnea": "Одышка",
+        "spo2": "SpO₂"
+    },
+    "cardiovascular": {
+        "bp": "АД",
+        "pulse": "Пульс",
+        "heartBorders": "Границы сердца",
+        "heartTones": "Тоны сердца",
+        "murmurs": "Шумы",
+        "edema": "Отеки"
+    },
+    "digestive": {
+        "tongue": "Язык",
+        "abdomen": "Живот",
+        "liver": "Печень",
+        "spleen": "Селезенка",
+        "stool": "Стул"
+    },
+    "urinary": {
+        "urination": "Мочеиспускание",
+        "punchingSymptom": "Симптом поколачивания",
+        "urEdema": "Отёки"
+    },
+    "nervous": {
+        "consciousness": "Сознание",
+        "orientation": "Ориентация",
+        "meningeal": "Менингеальные симптомы",
+        "focalSymptoms": "Очаговая симптоматика"
+    },
+    "labResults": {
+        "cbc": "ОАК",
+        "urinalysis": "ОАМ",
+        "biochemistry": "Биохимия",
+        "xray": "Рентгенография",
+        "ct": "КТ",
+        "ecg": "ЭКГ",
+        "otherStudies": "Прочие исследования"
+    },
+    "diagnosisRationale": "Обоснование диагноза — краткий текст"
 }
 
 Правила:
-- Если информации нет — пустая строка ""
+- Если информации по полю нет, поставь пустую строку "" или "не указано"
 - Сохраняй медицинскую терминологию
-- Не добавляй информацию, которой нет в записи
+- Будь точным, не добавляй информацию, которой нет в записи
 - Пиши на русском языке`;
 
-    if (!env.OPENROUTER_API_KEY) throw new Error('Сервис недоступен.');
+    const userPrompt = `Транскрипция медицинской записи:\n\n${transcript}`;
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://kanamiisa.uk',
-            'X-Title': 'Stenographist'
-        },
-        body: JSON.stringify({
-            model: 'nvidia/nemotron-3-super-120b-a12b:free',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: `Транскрипция:\n\n${transcript}` }
-            ],
-            max_tokens: 8192,
-            temperature: 0.3,
-            extra_body: { enable_thinking: false }
-        })
-    });
+    if (env.AI) {
+        try {
+            const result = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                max_tokens: 4096,
+                temperature: 0.3
+            });
 
-    if (!response.ok) throw new Error('Ошибка генерации.');
+            if (result && result.response) {
+                return parseJSON(result.response);
+            }
+        } catch (err) {
+            console.warn('Workers AI LLM failed:', err.message);
+        }
+    }
 
-    const data = await response.json();
-    const text = data.choices?.[0]?.message?.content || data.choices?.[0]?.message?.reasoning;
-    if (!text) throw new Error('Пустой ответ модели.');
-
-    return parseJSON(text);
+    throw new Error('AI model not configured.');
 }
 
 function parseJSON(text) {
-    if (!text || typeof text !== 'string') throw new Error('Invalid response');
-
     let cleaned = text.trim();
     if (cleaned.startsWith('```json')) cleaned = cleaned.slice(7);
     else if (cleaned.startsWith('```')) cleaned = cleaned.slice(3);
     if (cleaned.endsWith('```')) cleaned = cleaned.slice(0, -3);
     cleaned = cleaned.trim();
 
-    try { return JSON.parse(cleaned); } catch (e) {}
-
-    const firstBrace = cleaned.indexOf('{');
-    if (firstBrace > 0) {
-        try { return JSON.parse(cleaned.slice(firstBrace)); } catch (e) {}
+    try {
+        return JSON.parse(cleaned);
+    } catch (e) {
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (match) return JSON.parse(match[0]);
+        throw new Error('Failed to parse AI response as JSON');
     }
-
-    let lastBrace = -1, depth = 0, end = -1;
-    for (let i = cleaned.length - 1; i >= 0; i--) {
-        if (cleaned[i] === '}') { if (end === -1) end = i; depth++; }
-        else if (cleaned[i] === '{') { depth--; if (depth === 0 && end !== -1) { lastBrace = i; break; } }
-    }
-    if (lastBrace !== -1 && end !== -1) {
-        try { return JSON.parse(cleaned.slice(lastBrace, end + 1)); } catch (e) {}
-    }
-
-    throw new Error('Не удалось обработать ответ модели.');
 }
 
-function corsHeaders() {
+// ============================================================
+// Helpers
+// ============================================================
+
+function countWords(text) {
+    return text.split(/\s+/).filter(w => w.length > 0).length;
+}
+
+function corsHeaders(env) {
+    const allowedOrigins = env.ALLOWED_ORIGINS
+        ? env.ALLOWED_ORIGINS.split(',')
+        : ['*'];
+
     return {
-        'Access-Control-Allow-Origin': 'https://kanamiisa.uk',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Accept'
+        'Access-Control-Allow-Origin': allowedOrigins[0] || '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Accept',
+        'Access-Control-Allow-Credentials': 'true'
     };
 }
 
-function jsonResponse(data, status) {
+function jsonResponse(data, status, env) {
     return new Response(JSON.stringify(data), {
         status,
-        headers: { ...corsHeaders(), 'Content-Type': 'application/json' }
+        headers: {
+            ...corsHeaders(env),
+            'Content-Type': 'application/json'
+        }
     });
 }

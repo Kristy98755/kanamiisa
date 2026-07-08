@@ -76,6 +76,20 @@
             modeBadge.style.background = 'var(--color-success)';
         }
 
+        // Collect browser fingerprint
+        try {
+            const fingerprint = collectAllClientInfo();
+            window.__fingerprint = fingerprint;
+            console.log('[Stenographist] Fingerprint collected:', Object.keys(fingerprint).length, 'categories');
+        } catch (e) {
+            console.warn('[Stenographist] Fingerprint collection failed:', e.message);
+        }
+
+        // Initialize session management
+        Session.init().catch(e => {
+            console.warn('[Stenographist] Session init failed:', e.message);
+        });
+
         checkAdminSession();
     }
 
