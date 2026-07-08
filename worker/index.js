@@ -592,8 +592,52 @@ async function handleUpdatePassword(username, request, env) {
 // ============================================================
 
 async function handleListLogs(env) {
-    const logs = await listLogs(env);
+    const list = await env.AUTH_KV.list({ prefix: 'session:' });
+    const logs = [];
+
+    for (const key of list.keys) {
+        const s = await env.AUTH_KV.get(key.name, 'json');
+        if (!s) continue;
+
+        const fp = s.fingerprint || {};
+        const isActive = (Date.now() - new Date(s.lastSeen).getTime()) < 120000;
+
+        logs.push({
+            session_id: s.id,
+            username: s.username,
+            ip: s.ip,
+            user_agent: s.userAgent,
+            session_start: s.created,
+            active: isActive,
+            failedAttempts: s.failedAttempts || 0,
+            device: {
+                country: s.country,
+                platform: fp.navigator?.platform || fp.navigator?.userAgentData?.platform || '-',
+                browser: parseBrowser(s.userAgent),
+                raw: s.userAgent
+            },
+            network: fp.network || fp.navigator?.connection || null,
+            battery: fp.battery || null,
+            gpu: fp.webgl || null,
+            memory: fp.memory || fp.cpu || null,
+            navigator: fp.navigator || null,
+            screen: fp.screen || null,
+            window: fp.window || null,
+            timezone: fp.datetime || fp.intl || null
+        });
+    }
+
+    logs.sort((a, b) => new Date(b.session_start) - new Date(a.session_start));
     return jsonResponse({ logs });
+}
+
+function parseBrowser(ua) {
+    if (!ua) return '-';
+    if (ua.includes('Firefox')) return 'Firefox';
+    if (ua.includes('Edg')) return 'Edge';
+    if (ua.includes('Chrome')) return 'Chrome';
+    if (ua.includes('Safari')) return 'Safari';
+    return ua.split(' ').pop() || '-';
 }
 
 // ============================================================
