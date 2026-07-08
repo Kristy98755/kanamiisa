@@ -170,6 +170,7 @@
         </div>
     </div>
 
+    <script src="/qrcode.js"></script>
     <script>
         function showError(message) {
             const el = document.getElementById('error');
@@ -245,7 +246,10 @@
                     return;
                 }
 
-                document.getElementById('qr-image').src = data.qr_url;
+                const qr = qrcode(0, 'M');
+                qr.addData(data.uri);
+                qr.make();
+                document.getElementById('qr-image').src = qr.createDataURL(4, 8);
                 document.getElementById('secret-display').textContent = data.secret;
                 document.getElementById('qr-container').classList.remove('hidden');
 
@@ -275,8 +279,11 @@
                     return;
                 }
 
-                if (data.qr_url) {
-                    document.getElementById('current-qr-image').src = data.qr_url;
+                if (data.uri) {
+                    const qr = qrcode(0, 'M');
+                    qr.addData(data.uri);
+                    qr.make();
+                    document.getElementById('current-qr-image').src = qr.createDataURL(4, 8);
                     document.getElementById('current-secret-display').textContent = data.secret;
                     document.getElementById('current-qr').classList.remove('hidden');
                 } else {
