@@ -541,6 +541,11 @@
             const details = [];
             details.push(`IP:            ${log.ip || '-'}`);
             details.push(`Страна:        ${log.device?.country || '??'} ${flag}`);
+            details.push(`Начало:        ${ts}`);
+            if (log.last_seen) {
+                const lastSeen = new Date(log.last_seen).toLocaleString('ru-RU');
+                details.push(`Активность:    ${lastSeen}`);
+            }
             if (log.network) {
                 details.push(`Сеть:          ${log.network.effectiveType || '-'}${log.network.downlink ? ', ' + log.network.downlink + ' Mbps' : ''}${log.network.rtt ? ', RTT ' + log.network.rtt + 'ms' : ''}`);
                 if (log.network.type) details.push(`Тип:           ${log.network.type}`);

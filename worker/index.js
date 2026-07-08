@@ -605,6 +605,7 @@ async function handleListLogs(env) {
             ip: s.ip,
             user_agent: s.userAgent,
             session_start: s.created,
+            last_seen: s.lastSeen,
             active: isActive,
             failedAttempts: s.failedAttempts || 0,
             device: {
