@@ -406,25 +406,45 @@ async function handleAuth(request, env) {
         const sessionId = await createSession(env, username, isRoot);
 
         // Also create/update stenographist session with role
-        const stenoSessionId = getSessionId(request);
-        if (stenoSessionId) {
-            const stenoSession = await env.AUTH_KV.get(`session:${stenoSessionId}`, 'json');
-            if (stenoSession) {
-                stenoSession.username = username;
-                stenoSession.role = isRoot ? 'root' : 'guest';
-                await env.AUTH_KV.put(
-                    `session:${stenoSessionId}`,
-                    JSON.stringify(stenoSession),
-                    { expirationTtl: 3600 }
-                );
+        let stenoSessionId = getSessionId(request);
+        if (!stenoSessionId) {
+            stenoSessionId = crypto.randomUUID();
+        }
 
-                const listKey = `session_list:${username}`;
-                const list = await env.AUTH_KV.get(listKey, 'json') || [];
-                if (!list.includes(stenoSessionId)) {
-                    list.push(stenoSessionId);
-                    await env.AUTH_KV.put(listKey, JSON.stringify(list), { expirationTtl: 3600 });
-                }
-            }
+        const stenoSession = await env.AUTH_KV.get(`session:${stenoSessionId}`, 'json');
+        if (stenoSession) {
+            stenoSession.username = username;
+            stenoSession.role = isRoot ? 'root' : 'guest';
+            await env.AUTH_KV.put(
+                `session:${stenoSessionId}`,
+                JSON.stringify(stenoSession),
+                { expirationTtl: 3600 }
+            );
+        } else {
+            const now = new Date().toISOString();
+            await env.AUTH_KV.put(
+                `session:${stenoSessionId}`,
+                JSON.stringify({
+                    id: stenoSessionId,
+                    created: now,
+                    lastSeen: now,
+                    ip: request.headers.get('CF-Connecting-IP') || 'unknown',
+                    country: request.headers.get('CF-IPCountry') || 'unknown',
+                    userAgent: request.headers.get('User-Agent') || 'unknown',
+                    username,
+                    role: isRoot ? 'root' : 'guest',
+                    failedAttempts: 0,
+                    events: []
+                }),
+                { expirationTtl: 3600 }
+            );
+        }
+
+        const listKey = `session_list:${username}`;
+        const list = await env.AUTH_KV.get(listKey, 'json') || [];
+        if (!list.includes(stenoSessionId)) {
+            list.push(stenoSessionId);
+            await env.AUTH_KV.put(listKey, JSON.stringify(list), { expirationTtl: 3600 });
         }
 
         const ip = request.headers.get('cf-connecting-ip') || 'unknown';
@@ -433,11 +453,16 @@ async function handleAuth(request, env) {
         const deviceInfo = { ...serverInfo, ...(clientInfo || {}) };
         await saveLog(env, username, ip, ua, deviceInfo, Date.now());
 
+        const cookies = [
+            `session=${sessionId}; Path=/; HttpOnly; SameSite=Strict`,
+            `session_id=${stenoSessionId}; Path=/stenographist; SameSite=Strict; Max-Age=3600`
+        ];
+
         return new Response(JSON.stringify({ success: true, is_root: isRoot }), {
             status: 200,
             headers: {
                 'Content-Type': 'application/json',
-                'Set-Cookie': `session=${sessionId}; Path=/; HttpOnly; SameSite=Strict`
+                'Set-Cookie': cookies.join(', ')
             }
         });
     } catch (err) {
