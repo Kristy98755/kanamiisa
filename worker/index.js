@@ -78,6 +78,12 @@ export default {
                 return handleDeleteUser(username, env);
             }
 
+            if (subpath.match(/^api\/users\/[^/]+$/) && request.method === 'PUT') {
+                if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
+                const username = subpath.split('/').pop();
+                return handleUpdatePassword(username, request, env);
+            }
+
             if (subpath === 'api/logs' && request.method === 'GET') {
                 if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
                 return handleListLogs(env);
@@ -249,6 +255,26 @@ async function handleDeleteUser(username, env) {
     }
 
     await deleteUser(env, username);
+    return jsonResponse({ success: true });
+}
+
+async function handleUpdatePassword(username, request, env) {
+    if (username === 'kanamiisa') {
+        return jsonResponse({ error: 'Cannot change root password this way' }, 403);
+    }
+
+    const { password } = await request.json();
+    if (!password || password.length < 4) {
+        return jsonResponse({ error: 'Password must be at least 4 characters' }, 400);
+    }
+
+    const user = await getUser(env, username);
+    if (!user) {
+        return jsonResponse({ error: 'User not found' }, 404);
+    }
+
+    const hash = await hashPassword(password);
+    await saveUser(env, username, hash);
     return jsonResponse({ success: true });
 }
 

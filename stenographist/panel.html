@@ -253,14 +253,13 @@
                     <thead>
                         <tr>
                             <th>Пользователь</th>
-                            <th>Роль</th>
                             <th>Создан</th>
                             <th>Действия</th>
                         </tr>
                     </thead>
                     <tbody id="users-table">
                         <tr>
-                            <td colspan="4" class="empty-state">Загрузка...</td>
+                            <td colspan="3" class="empty-state">Загрузка...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -334,25 +333,30 @@
                 const tbody = document.getElementById('users-table');
 
                 if (!data.users || data.users.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Нет пользователей</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="3" class="empty-state">Нет пользователей</td></tr>';
                     return;
                 }
 
-                tbody.innerHTML = data.users.map(user => `
-                    <tr>
-                        <td>${escapeHtml(user.username)}</td>
-                        <td><span class="badge ${user.username === 'kanamiisa' ? 'root' : ''}">${user.username === 'kanamiisa' ? 'Root' : 'Гость'}</span></td>
-                        <td>${new Date(user.created_at).toLocaleDateString('ru-RU')}</td>
-                        <td>
-                            ${user.username !== 'kanamiisa' ? `
-                                <button class="btn btn-danger btn-sm" onclick="deleteUser('${escapeHtml(user.username)}')">Удалить</button>
-                            ` : ''}
-                        </td>
-                    </tr>
-                `).join('');
+                tbody.innerHTML = data.users.map(user => renderUserRow(user)).join('');
             } catch (err) {
                 console.error('Failed to load users:', err);
             }
+        }
+
+        function renderUserRow(user) {
+            const isRoot = user.username === 'kanamiisa';
+            return `
+                <tr data-username="${escapeHtml(user.username)}">
+                    <td>${escapeHtml(user.username)}${isRoot ? ' <span class="badge root">Root</span>' : ''}</td>
+                    <td>${new Date(user.created_at).toLocaleDateString('ru-RU')}</td>
+                    <td>
+                        ${!isRoot ? `
+                            <button class="btn btn-sm" style="background:#333;color:#fff;" onclick="changePassword('${escapeHtml(user.username)}')">Сменить пароль</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteUser('${escapeHtml(user.username)}')">Удалить</button>
+                        ` : ''}
+                    </td>
+                </tr>
+            `;
         }
 
         // Create user
@@ -383,7 +387,13 @@
                 document.getElementById('new-username').value = '';
                 document.getElementById('new-password').value = '';
                 hideError('users-error');
-                loadUsers();
+
+                const tbody = document.getElementById('users-table');
+                const emptyRow = tbody.querySelector('.empty-state');
+                if (emptyRow) emptyRow.closest('tr').remove();
+
+                const user = { username, created_at: Date.now() };
+                tbody.insertAdjacentHTML('beforeend', renderUserRow(user));
             } catch (err) {
                 showError('users-error', 'Ошибка сети');
             }
@@ -404,7 +414,32 @@
                     return;
                 }
 
-                loadUsers();
+                const row = document.querySelector(`tr[data-username="${CSS.escape(username)}"]`);
+                if (row) row.remove();
+            } catch (err) {
+                alert('Ошибка сети');
+            }
+        }
+
+        // Change password
+        async function changePassword(username) {
+            const password = prompt(`Новый пароль для ${username}:`);
+            if (!password) return;
+
+            try {
+                const res = await fetch(`/stenographist/api/users/${encodeURIComponent(username)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    alert(data.error || 'Ошибка');
+                    return;
+                }
+
+                alert('Пароль изменён');
             } catch (err) {
                 alert('Ошибка сети');
             }
