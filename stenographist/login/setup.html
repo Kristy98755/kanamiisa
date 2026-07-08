@@ -249,7 +249,8 @@
                 const qr = qrcode(0, 'M');
                 qr.addData(data.uri);
                 qr.make();
-                document.getElementById('qr-image').src = qr.createDataURL(4, 8);
+                const svgData = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(qr.createSvgTag(4, 8));
+                document.getElementById('qr-image').src = svgData;
                 document.getElementById('secret-display').textContent = data.secret;
                 document.getElementById('qr-container').classList.remove('hidden');
 
@@ -283,7 +284,8 @@
                     const qr = qrcode(0, 'M');
                     qr.addData(data.uri);
                     qr.make();
-                    document.getElementById('current-qr-image').src = qr.createDataURL(4, 8);
+                    const svgData = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(qr.createSvgTag(4, 8));
+                    document.getElementById('current-qr-image').src = svgData;
                     document.getElementById('current-secret-display').textContent = data.secret;
                     document.getElementById('current-qr').classList.remove('hidden');
                 } else {

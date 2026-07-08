@@ -50,8 +50,8 @@ export default {
             }
 
             // TOTP setup page (cheat code protected, no session)
-            if (subpath === 'setup' || subpath === 'setup/') {
-                return serveFile(env, 'stenographist/setup.html');
+            if (subpath === 'login/setup' || subpath === 'login/setup/') {
+                return serveFile(env, 'stenographist/login/setup.html');
             }
 
             // Everything else requires auth
