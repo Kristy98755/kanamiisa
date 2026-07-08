@@ -96,8 +96,13 @@ const Session = (() => {
     // --- Heartbeat ---
     function startHeartbeat() {
         stopHeartbeat();
-        heartbeatTimer = setInterval(() => {
-            sendEvent('heartbeat');
+        heartbeatTimer = setInterval(async () => {
+            const result = await sendEvent('heartbeat');
+            if (result && result.kick) {
+                console.warn('[Session] Kicked by admin');
+                stopHeartbeat();
+                logout();
+            }
         }, HEARTBEAT_INTERVAL);
     }
 

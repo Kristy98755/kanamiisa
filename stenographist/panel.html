@@ -235,6 +235,14 @@
             border-radius: 50%;
             animation: pulse 1.5s infinite;
         }
+        .kicked-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #FF9800;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.4; }
@@ -599,7 +607,16 @@
                     body: JSON.stringify({ session_id: sessionId })
                 });
                 if (res.ok) {
-                    loadLogs();
+                    const killBtn = document.querySelector(`button[onclick*="${sessionId}"]`);
+                    if (killBtn) {
+                        const row = killBtn.closest('tr');
+                        const dot = row.querySelector('.active-dot');
+                        if (dot) {
+                            dot.className = 'kicked-dot';
+                            dot.title = 'Выкивается...';
+                            setTimeout(() => dot.remove(), 15000);
+                        }
+                    }
                 } else {
                     const data = await res.json();
                     alert(data.error || 'Ошибка');

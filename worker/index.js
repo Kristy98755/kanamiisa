@@ -189,6 +189,10 @@ async function handleEvent(request, env) {
             { expirationTtl: 3600 }
         );
 
+        if (session.kick) {
+            return jsonResponse({ ok: true, session_id, kick: true });
+        }
+
         return jsonResponse({ ok: true, session_id });
     } catch (err) {
         console.error('Event error:', err);
@@ -350,19 +354,12 @@ async function handleKillSession(request, env) {
             return jsonResponse({ error: 'Session not found' }, 404);
         }
 
-        if (targetSession.username) {
-            const listKey = `session_list:${targetSession.username}`;
-            const list = await env.AUTH_KV.get(listKey, 'json') || [];
-            const newList = list.filter(id => id !== session_id);
-            if (newList.length > 0) {
-                await env.AUTH_KV.put(listKey, JSON.stringify(newList), { expirationTtl: 3600 });
-            } else {
-                await env.AUTH_KV.delete(listKey);
-            }
-        }
-
-        await env.AUTH_KV.delete(`session:${session_id}`);
-        await env.AUTH_KV.delete(`failed:${session_id}`);
+        targetSession.kick = true;
+        await env.AUTH_KV.put(
+            `session:${session_id}`,
+            JSON.stringify(targetSession),
+            { expirationTtl: 3600 }
+        );
 
         return jsonResponse({ ok: true });
     } catch (err) {
