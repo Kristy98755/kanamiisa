@@ -104,12 +104,10 @@ export default {
             return serveFile(env, path.slice(1)); // Remove leading /
         }
 
-        // Root redirect
+        // Everything else: serve static files directly (no auth)
         if (path === '/' || path === '') {
-            return Response.redirect(new URL('/stenographist/', request.url), 302);
+            return serveFile(env, 'index.html');
         }
-
-        // Fallback: try to serve static file
         return serveFile(env, path.slice(1));
     }
 };
