@@ -589,10 +589,31 @@ async function handleUpdatePassword(username, request, env) {
 // ============================================================
 
 async function handleListLogs(env) {
-    const list = await env.AUTH_KV.list({ prefix: 'session:' });
     const logs = [];
 
-    for (const key of list.keys) {
+    // 1. Read old login logs from auth.js (log:* prefix)
+    const oldKeys = await env.AUTH_KV.list({ prefix: 'log:', limit: 100 });
+    for (const key of oldKeys.keys) {
+        const data = await env.AUTH_KV.get(key.name, 'json');
+        if (!data) continue;
+        logs.push({
+            session_id: null,
+            username: data.username,
+            ip: data.ip,
+            user_agent: data.user_agent,
+            session_start: data.session_start,
+            last_seen: null,
+            active: false,
+            failedAttempts: 0,
+            device: data.device || {},
+            network: null, battery: null, gpu: null, memory: null,
+            navigator: null, screen: null, window: null, timezone: null
+        });
+    }
+
+    // 2. Read stenographist sessions (session:* prefix)
+    const sessionKeys = await env.AUTH_KV.list({ prefix: 'session:' });
+    for (const key of sessionKeys.keys) {
         const s = await env.AUTH_KV.get(key.name, 'json');
         if (!s) continue;
 
@@ -625,7 +646,7 @@ async function handleListLogs(env) {
         });
     }
 
-    logs.sort((a, b) => new Date(b.session_start) - new Date(a.session_start));
+    logs.sort((a, b) => new Date(b.session_start || 0) - new Date(a.session_start || 0));
     return jsonResponse({ logs });
 }
 
