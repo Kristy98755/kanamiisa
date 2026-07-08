@@ -70,6 +70,9 @@ export default {
         if (request.method === 'POST' && path === '/stenographist/login/api/logout') {
             return handleLogout(request, env);
         }
+        if (request.method === 'POST' && path === '/stenographist/login/api/auth') {
+            return handleAuth(request, env);
+        }
 
         // --- Audio processing (auth required) ---
         if (request.method === 'POST' && path === '/stenographist/api/process') {

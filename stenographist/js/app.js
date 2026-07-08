@@ -96,8 +96,8 @@
     async function checkAdminSession() {
         try {
             const res = await fetch('/stenographist/api/session');
-            if (!res.ok) return;
             const data = await res.json();
+            console.log('[Admin] Session check:', data);
             if (data.valid && data.role === 'root') {
                 const btn = document.createElement('a');
                 btn.href = '/stenographist/panel.html';
@@ -106,7 +106,9 @@
                 btn.title = 'Управление пользователями и логами';
                 document.querySelector('.header__right').appendChild(btn);
             }
-        } catch {}
+        } catch (e) {
+            console.warn('[Admin] Session check failed:', e);
+        }
     }
 
     document.getElementById('btnLogout').addEventListener('click', async () => {
