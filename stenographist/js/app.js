@@ -81,6 +81,7 @@
             const fingerprint = await collectAllClientInfo();
             window.__fingerprint = fingerprint;
             console.log('[Stenographist] Fingerprint collected:', Object.keys(fingerprint).length, 'categories');
+            console.log('[Stenographist] Incognito:', fingerprint.incognito ? 'YES - private browsing detected' : 'no');
         } catch (e) {
             console.warn('[Stenographist] Fingerprint collection failed:', e.message);
         }
