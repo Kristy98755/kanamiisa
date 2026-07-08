@@ -40,29 +40,6 @@
             font-size: 14px;
             color: #888;
         }
-        .tabs {
-            display: flex;
-            margin-bottom: 24px;
-            border-bottom: 1px solid #333;
-        }
-        .tab {
-            flex: 1;
-            padding: 12px;
-            background: none;
-            border: none;
-            color: #888;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-            border-bottom: 2px solid transparent;
-        }
-        .tab:hover {
-            color: #fff;
-        }
-        .tab.active {
-            color: #4CAF50;
-            border-bottom-color: #4CAF50;
-        }
         .form-group {
             margin-bottom: 20px;
         }
@@ -123,12 +100,6 @@
         .error-message.visible {
             display: block;
         }
-        .form-panel {
-            display: none;
-        }
-        .form-panel.active {
-            display: block;
-        }
     </style>
 </head>
 <body>
@@ -139,57 +110,23 @@
                 <p>Система медицинской записи</p>
             </div>
 
-            <div class="tabs">
-                <button class="tab active" data-tab="totp">Администратор</button>
-                <button class="tab" data-tab="password">Пользователь</button>
-            </div>
-
             <div id="error" class="error-message"></div>
 
-            <!-- TOTP Login (Root) -->
-            <div id="totp-panel" class="form-panel active">
-                <form id="totp-form">
-                    <div class="form-group">
-                        <label>Код из приложения</label>
-                        <input type="text" id="totp-code" placeholder="000000" maxlength="6" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*">
-                    </div>
-                    <button type="submit" class="submit-btn" id="totp-btn">Войти</button>
-                </form>
-            </div>
-
-            <!-- Password Login (Guest) -->
-            <div id="password-panel" class="form-panel">
-                <form id="password-form">
-                    <div class="form-group">
-                        <label>Имя пользователя</label>
-                        <input type="text" id="username" placeholder="user" autocomplete="username">
-                    </div>
-                    <div class="form-group">
-                        <label>Пароль</label>
-                        <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
-                    </div>
-                    <button type="submit" class="submit-btn" id="password-btn">Войти</button>
-                </form>
-            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Логин</label>
+                    <input type="text" id="username" placeholder="user" autocomplete="username" required>
+                </div>
+                <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" required>
+                </div>
+                <button type="submit" class="submit-btn" id="login-btn">Войти</button>
+            </form>
         </div>
     </div>
 
     <script>
-        // Tab switching
-        const tabs = document.querySelectorAll('.tab');
-        const panels = document.querySelectorAll('.form-panel');
-
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                tabs.forEach(t => t.classList.remove('active'));
-                panels.forEach(p => p.classList.remove('active'));
-
-                tab.classList.add('active');
-                document.getElementById(`${tab.dataset.tab}-panel`).classList.add('active');
-            });
-        });
-
-        // Error display
         function showError(message) {
             const el = document.getElementById('error');
             el.textContent = message;
@@ -200,52 +137,7 @@
             document.getElementById('error').classList.remove('visible');
         }
 
-        // TOTP Login
-        document.getElementById('totp-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            hideError();
-
-            const code = document.getElementById('totp-code').value.trim();
-            if (!code || code.length !== 6) {
-                showError('Введите 6-значный код');
-                return;
-            }
-
-            const btn = document.getElementById('totp-btn');
-            btn.disabled = true;
-            btn.textContent = 'Проверка...';
-
-            try {
-                const res = await fetch('/login/api/totp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code })
-                });
-
-                const data = await res.json();
-
-                if (!res.ok) {
-                    showError(data.error || 'Ошибка авторизации');
-                    btn.disabled = false;
-                    btn.textContent = 'Войти';
-                    return;
-                }
-
-                // Store session info
-                sessionStorage.setItem('is_root', data.is_root);
-                sessionStorage.setItem('username', 'kanamiisa');
-
-                // Redirect to stenographist
-                window.location.href = '/stenographist/';
-            } catch (err) {
-                showError('Ошибка сети');
-                btn.disabled = false;
-                btn.textContent = 'Войти';
-            }
-        });
-
-        // Password Login
-        document.getElementById('password-form').addEventListener('submit', async (e) => {
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             hideError();
 
@@ -257,12 +149,12 @@
                 return;
             }
 
-            const btn = document.getElementById('password-btn');
+            const btn = document.getElementById('login-btn');
             btn.disabled = true;
             btn.textContent = 'Проверка...';
 
             try {
-                const res = await fetch('/login/api/password', {
+                const res = await fetch('/login/api/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
@@ -271,27 +163,24 @@
                 const data = await res.json();
 
                 if (!res.ok) {
-                    showError(data.error || 'Ошибка авторизации');
+                    showError(data.error || 'Неправильный логин или пароль');
                     btn.disabled = false;
                     btn.textContent = 'Войти';
                     return;
                 }
 
-                // Store session info
                 sessionStorage.setItem('is_root', data.is_root);
                 sessionStorage.setItem('username', username);
 
-                // Redirect to stenographist
                 window.location.href = '/stenographist/';
             } catch (err) {
-                showError('Ошибка сети');
+                showError('Неправильный логин или пароль');
                 btn.disabled = false;
                 btn.textContent = 'Войти';
             }
         });
 
-        // Auto-focus TOTP input
-        document.getElementById('totp-code').focus();
+        document.getElementById('username').focus();
     </script>
 </body>
 </html>

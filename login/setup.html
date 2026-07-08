@@ -40,89 +40,12 @@
             font-size: 14px;
             color: #888;
         }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        .form-group label {
-            display: block;
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 14px 16px;
-            background: #0a0a0a;
-            border: 1px solid #333;
-            border-radius: 8px;
-            color: #fff;
-            font-size: 16px;
-            transition: border-color 0.2s;
-        }
-        .form-group input:focus {
-            outline: none;
-            border-color: #4CAF50;
-        }
-        .form-group input::placeholder {
-            color: #555;
-        }
-        .submit-btn {
-            width: 100%;
-            padding: 14px;
-            background: #4CAF50;
-            border: none;
-            border-radius: 8px;
-            color: #fff;
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .submit-btn:hover {
-            background: #45a049;
-        }
-        .submit-btn:disabled {
-            background: #333;
-            cursor: not-allowed;
-        }
-        .error-message {
-            display: none;
-            padding: 12px;
-            background: #3a1a1a;
-            border: 1px solid #5a2a2a;
-            border-radius: 8px;
-            color: #ff6b6b;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
-        .error-message.visible {
-            display: block;
-        }
-        .success-message {
-            display: none;
-            padding: 12px;
-            background: #1a3a1a;
-            border: 1px solid #2a5a2a;
-            border-radius: 8px;
-            color: #4CAF50;
-            font-size: 14px;
-            margin-bottom: 20px;
-        }
-        .success-message.visible {
-            display: block;
-        }
         .qr-container {
-            display: none;
             text-align: center;
-            margin-top: 24px;
             padding: 20px;
             background: #fff;
             border-radius: 8px;
-        }
-        .qr-container.visible {
-            display: block;
+            margin-bottom: 20px;
         }
         .qr-container img {
             max-width: 200px;
@@ -137,6 +60,46 @@
             background: #f5f5f5;
             border-radius: 4px;
             margin-top: 12px;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-bottom: 12px;
+        }
+        .btn-primary {
+            background: #4CAF50;
+        }
+        .btn-primary:hover {
+            background: #45a049;
+        }
+        .btn-secondary {
+            background: #333;
+        }
+        .btn-secondary:hover {
+            background: #444;
+        }
+        .error-message {
+            display: none;
+            padding: 12px;
+            background: #3a1a1a;
+            border: 1px solid #5a2a2a;
+            border-radius: 8px;
+            color: #ff6b6b;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .error-message.visible {
+            display: block;
+        }
+        .hidden {
+            display: none;
         }
         .back-link {
             display: block;
@@ -169,25 +132,18 @@
             </div>
 
             <div id="error" class="error-message"></div>
-            <div id="success" class="success-message"></div>
 
-            <!-- Cheat Code Form -->
-            <div id="code-form-container">
-                <form id="code-form">
-                    <div class="form-group">
-                        <label>Код доступа</label>
-                        <input type="text" id="cheat-code" placeholder="Введите код" autocomplete="off">
-                    </div>
-                    <button type="submit" class="submit-btn" id="code-btn">Получить доступ</button>
-                </form>
+            <!-- Waiting for cheat code -->
+            <div id="waiting" class="hidden">
+                <p style="text-align: center; color: #888;">Запрос кода доступа...</p>
             </div>
 
-            <!-- Setup Panel (hidden by default) -->
-            <div id="setup-panel" style="display: none;">
+            <!-- Setup panel (hidden until authenticated) -->
+            <div id="setup-panel" class="hidden">
                 <div class="section-title">Новый секрет</div>
-                <button type="button" class="submit-btn" id="generate-btn" style="margin-bottom: 16px;">Сгенерировать новый секрет</button>
+                <button type="button" class="btn btn-primary" id="generate-btn">Сгенерировать новый секрет</button>
 
-                <div id="qr-container" class="qr-container">
+                <div id="qr-container" class="qr-container hidden">
                     <img id="qr-image" src="" alt="QR Code">
                     <div class="secret-display" id="secret-display"></div>
                     <p style="font-size: 12px; color: #666; margin-top: 12px;">
@@ -197,67 +153,89 @@
 
                 <div style="margin-top: 24px;">
                     <div class="section-title">Текущий секрет</div>
-                    <button type="button" class="submit-btn" id="show-current-btn" style="background: #333;">Показать текущий</button>
-                    <div id="current-qr" class="qr-container" style="margin-top: 16px;">
+                    <button type="button" class="btn btn-secondary" id="show-current-btn">Показать текущий</button>
+                    <div id="current-qr" class="qr-container hidden" style="margin-top: 16px;">
                         <img id="current-qr-image" src="" alt="QR Code">
                         <div class="secret-display" id="current-secret-display"></div>
                     </div>
                 </div>
+
+                <div style="margin-top: 24px;">
+                    <div class="section-title">Готово</div>
+                    <a href="/login" class="btn btn-secondary" style="text-decoration: none; text-align: center; display: block;">Вернуться ко входу</a>
+                </div>
             </div>
 
-            <a href="/login" class="back-link">← Вернуться к входу</a>
+            <a href="/login" class="back-link">← Вернуться ко входу</a>
         </div>
     </div>
 
     <script>
-        let accessCode = '';
+        function showError(message) {
+            const el = document.getElementById('error');
+            el.textContent = message;
+            el.classList.add('visible');
+        }
 
-        document.getElementById('code-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            hideError();
+        function hideError() {
+            document.getElementById('error').classList.remove('visible');
+        }
 
-            const code = document.getElementById('cheat-code').value.trim();
-            if (!code) {
-                showError('Введите код');
-                return;
-            }
-
-            accessCode = code;
-
-            // Verify code by trying to get current secret
+        async function verifyCheatCode(code) {
             try {
-                const res = await fetch('/login/api/secret', {
+                const res = await fetch('/login/api/setup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: accessCode })
+                    body: JSON.stringify({ code })
                 });
 
                 if (res.ok) {
-                    const data = await res.json();
-                    document.getElementById('code-form-container').style.display = 'none';
-                    document.getElementById('setup-panel').style.display = 'block';
-
-                    if (data.qr_url) {
-                        document.getElementById('current-qr-image').src = data.qr_url;
-                        document.getElementById('current-secret-display').textContent = data.secret;
-                        document.getElementById('current-qr').classList.add('visible');
-                    }
-                } else {
-                    showError('Неверный код');
+                    return true;
                 }
+                return false;
             } catch (err) {
-                showError('Ошибка сети');
+                return false;
             }
-        });
+        }
+
+        async function init() {
+            // Show prompt for cheat code
+            const code = prompt('Введите код доступа:');
+            
+            if (code === null) {
+                // User cancelled
+                window.location.href = '/login';
+                return;
+            }
+
+            if (code === '') {
+                showError('Код не может быть пустым');
+                return;
+            }
+
+            const valid = await verifyCheatCode(code);
+            
+            if (!valid) {
+                showError('Неверный код доступа');
+                return;
+            }
+
+            // Show setup panel
+            document.getElementById('waiting').classList.add('hidden');
+            document.getElementById('setup-panel').classList.remove('hidden');
+        }
 
         document.getElementById('generate-btn').addEventListener('click', async () => {
             hideError();
 
             try {
+                const code = prompt('Введите код доступа:');
+                if (!code) return;
+
                 const res = await fetch('/login/api/setup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: accessCode })
+                    body: JSON.stringify({ code })
                 });
 
                 const data = await res.json();
@@ -269,7 +247,7 @@
 
                 document.getElementById('qr-image').src = data.qr_url;
                 document.getElementById('secret-display').textContent = data.secret;
-                document.getElementById('qr-container').classList.add('visible');
+                document.getElementById('qr-container').classList.remove('hidden');
 
                 showSuccess('Новый секрет сгенерирован. Отсканируйте QR-код.');
             } catch (err) {
@@ -281,10 +259,13 @@
             hideError();
 
             try {
+                const code = prompt('Введите код доступа:');
+                if (!code) return;
+
                 const res = await fetch('/login/api/secret', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: accessCode })
+                    body: JSON.stringify({ code })
                 });
 
                 const data = await res.json();
@@ -297,7 +278,7 @@
                 if (data.qr_url) {
                     document.getElementById('current-qr-image').src = data.qr_url;
                     document.getElementById('current-secret-display').textContent = data.secret;
-                    document.getElementById('current-qr').classList.add('visible');
+                    document.getElementById('current-qr').classList.remove('hidden');
                 } else {
                     showError('TOTP не настроен');
                 }
@@ -306,26 +287,13 @@
             }
         });
 
-        function showError(message) {
-            const el = document.getElementById('error');
-            el.textContent = message;
-            el.classList.add('visible');
-            document.getElementById('success').classList.remove('visible');
-        }
-
         function showSuccess(message) {
-            const el = document.getElementById('success');
-            el.textContent = message;
-            el.classList.add('visible');
-            document.getElementById('error').classList.remove('visible');
+            // Could add a success message element if needed
+            console.log(message);
         }
 
-        function hideError() {
-            document.getElementById('error').classList.remove('visible');
-        }
-
-        // Auto-focus
-        document.getElementById('cheat-code').focus();
+        // Initialize on page load
+        init();
     </script>
 </body>
 </html>

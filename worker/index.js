@@ -34,14 +34,9 @@ export default {
 
         // === Auth API ===
 
-        // Login with TOTP (root)
-        if (path === '/login/api/totp' && request.method === 'POST') {
-            return handleTOTPLogin(request, env);
-        }
-
-        // Login with password (guest)
-        if (path === '/login/api/password' && request.method === 'POST') {
-            return handlePasswordLogin(request, env);
+        // Unified login (TOTP for root, password for guests)
+        if (path === '/login/api/auth' && request.method === 'POST') {
+            return handleAuth(request, env);
         }
 
         // Logout
@@ -114,55 +109,37 @@ export default {
 
 // === Auth Handlers ===
 
-async function handleTOTPLogin(request, env) {
-    try {
-        const { code } = await request.json();
-        const secret = await getTOTPSecret(env);
-
-        if (!secret) {
-            return jsonResponse({ error: 'TOTP not configured. Visit /login/setup first.' }, 400);
-        }
-
-        const valid = await verify(secret, code);
-        if (!valid) {
-            return jsonResponse({ error: 'Invalid code' }, 401);
-        }
-
-        const sessionId = await createSession(env, 'kanamiisa', true);
-
-        // Log login
-        const ip = request.headers.get('cf-connecting-ip') || 'unknown';
-        const ua = request.headers.get('user-agent') || 'unknown';
-        const deviceInfo = await extractDeviceInfo(request);
-        await saveLog(env, 'kanamiisa', ip, ua, deviceInfo, Date.now());
-
-        return new Response(JSON.stringify({ success: true, is_root: true }), {
-            status: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Set-Cookie': `session=${sessionId}; Path=/; HttpOnly; SameSite=Strict`
-            }
-        });
-    } catch (err) {
-        return jsonResponse({ error: err.message }, 500);
-    }
-}
-
-async function handlePasswordLogin(request, env) {
+async function handleAuth(request, env) {
     try {
         const { username, password } = await request.json();
-        const user = await getUser(env, username);
 
-        if (!user) {
-            return jsonResponse({ error: 'User not found' }, 401);
+        if (!username || !password) {
+            return jsonResponse({ error: 'Неправильный логин или пароль' }, 401);
         }
 
-        const valid = await verifyPassword(password, user.password_hash);
+        let isRoot = false;
+        let valid = false;
+
+        if (username === 'kanamiisa') {
+            // Root user: password = TOTP code
+            const secret = await getTOTPSecret(env);
+            if (secret) {
+                valid = await verify(secret, password);
+            }
+            isRoot = true;
+        } else {
+            // Guest user: password = account password
+            const user = await getUser(env, username);
+            if (user) {
+                valid = await verifyPassword(password, user.password_hash);
+            }
+        }
+
         if (!valid) {
-            return jsonResponse({ error: 'Invalid password' }, 401);
+            return jsonResponse({ error: 'Неправильный логин или пароль' }, 401);
         }
 
-        const sessionId = await createSession(env, username, false);
+        const sessionId = await createSession(env, username, isRoot);
 
         // Log login
         const ip = request.headers.get('cf-connecting-ip') || 'unknown';
@@ -170,7 +147,7 @@ async function handlePasswordLogin(request, env) {
         const deviceInfo = await extractDeviceInfo(request);
         await saveLog(env, username, ip, ua, deviceInfo, Date.now());
 
-        return new Response(JSON.stringify({ success: true, is_root: false }), {
+        return new Response(JSON.stringify({ success: true, is_root: isRoot }), {
             status: 200,
             headers: {
                 'Content-Type': 'application/json',
@@ -178,7 +155,7 @@ async function handlePasswordLogin(request, env) {
             }
         });
     } catch (err) {
-        return jsonResponse({ error: err.message }, 500);
+        return jsonResponse({ error: 'Неправильный логин или пароль' }, 401);
     }
 }
 
