@@ -1233,44 +1233,42 @@ async function collectAllClientInfo() {
     };
   } catch (e) {}
 
-  // Incognito / Private mode detection
-  // Chromium: webkitTemporaryStorage quota (not faked by Chrome)
-  // Firefox: OPFS probe → Security error
-  // Safari: OPFS probe → "unknown transient reason"
+  // Incognito detection (pre-computed in <head>, fallback if not available)
   try {
-    info.incognito = await new Promise((resolve) => {
-      let settled = false;
-      function done(val) { if (!settled) { settled = true; resolve(val); } }
+    if (window.__incognito !== undefined) {
+      info.incognito = window.__incognito;
+    } else {
+      info.incognito = await new Promise((resolve) => {
+        let settled = false;
+        function done(val) { if (!settled) { settled = true; resolve(val); } }
 
-      const ua = navigator.userAgent;
-      const isChromium = !!window.webkitRequestFileSystem || (ua.includes('Chrome') && !ua.includes('Edg') && !ua.includes('OPR'));
-      const isFirefox = ua.includes('Firefox') && !ua.includes('Seamonkey');
-      const isSafari = !isChromium && !isFirefox && /Safari/.test(ua) && !navigator.brave;
+        const ua = navigator.userAgent;
+        const isChromium = !!window.webkitRequestFileSystem || (ua.includes('Chrome') && !ua.includes('Edg') && !ua.includes('OPR'));
+        const isFirefox = ua.includes('Firefox') && !ua.includes('Seamonkey');
 
-      if (isChromium && navigator.webkitTemporaryStorage && navigator.webkitTemporaryStorage.queryUsageAndQuota) {
-        // Chrome: incognito quota is memory-bound (~2x heap limit), normal is disk-bound (huge)
-        navigator.webkitTemporaryStorage.queryUsageAndQuota(
-          (used, granted) => {
-            const heapLimit = performance.memory ? performance.memory.jsHeapSizeLimit : 2 * 1024 * 1024 * 1024;
-            done(granted < heapLimit * 2);
-          },
-          () => done(false)
-        );
-      } else if (navigator.storage && navigator.storage.getDirectory) {
-        // Firefox / Safari: OPFS probe
-        navigator.storage.getDirectory().then(
-          () => done(false),
-          (e) => {
-            const msg = e instanceof Error ? e.message : String(e);
-            done(msg.includes('Security error') || msg.includes('unknown transient reason'));
-          }
-        );
-      } else {
-        done(false);
-      }
+        if (isChromium && navigator.webkitTemporaryStorage && navigator.webkitTemporaryStorage.queryUsageAndQuota) {
+          navigator.webkitTemporaryStorage.queryUsageAndQuota(
+            (used, granted) => {
+              const heapLimit = performance.memory ? performance.memory.jsHeapSizeLimit : 2 * 1024 * 1024 * 1024;
+              done(granted < heapLimit * 2);
+            },
+            () => done(false)
+          );
+        } else if (navigator.storage && navigator.storage.getDirectory) {
+          navigator.storage.getDirectory().then(
+            () => done(false),
+            (e) => {
+              const msg = e instanceof Error ? e.message : String(e);
+              done(msg.includes('Security error') || msg.includes('unknown transient reason'));
+            }
+          );
+        } else {
+          done(false);
+        }
 
-      setTimeout(() => done(false), 3000);
-    });
+        setTimeout(() => done(false), 3000);
+      });
+    }
   } catch (e) {
     info.incognito = false;
   }

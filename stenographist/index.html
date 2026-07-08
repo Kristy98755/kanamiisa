@@ -7,6 +7,48 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <script>
+    (function() {
+        function showIncognitoOverlay() {
+            if (document.getElementById('incognito-overlay')) return;
+            var overlay = document.createElement('div');
+            overlay.id = 'incognito-overlay';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,15,25,0.97);display:flex;align-items:center;justify-content:center;text-align:center;font-family:system-ui,-apple-system,sans-serif;';
+            overlay.innerHTML = '<div style="max-width:460px;padding:40px"><div style="font-size:64px;margin-bottom:20px">&#128274;</div><h1 style="color:#ff6b6b;font-size:24px;margin:0 0 16px">Режим инкогнито</h1><p style="color:#ccc;font-size:16px;line-height:1.6;margin:0">В режиме инкогнито не работает сохранение данных.<br><br>Пожалуйста, откройте страницу в <b style="color:#fff">обычном режиме</b>.</p></div>';
+            document.documentElement.appendChild(overlay);
+        }
+
+        window.__incognitoCheck = new Promise(function(resolve) {
+            var done = false;
+            function finish(val) { if (!done) { done = true; resolve(val); } }
+
+            var ua = navigator.userAgent;
+            var isChromium = !!window.webkitRequestFileSystem || (ua.includes('Chrome') && !ua.includes('Edg') && !ua.includes('OPR'));
+            var isFirefox = ua.includes('Firefox') && !ua.includes('Seamonkey');
+
+            if (isChromium && navigator.webkitTemporaryStorage && navigator.webkitTemporaryStorage.queryUsageAndQuota) {
+                navigator.webkitTemporaryStorage.queryUsageAndQuota(function(used, granted) {
+                    var heapLimit = performance.memory ? performance.memory.jsHeapSizeLimit : 2 * 1024 * 1024 * 1024;
+                    finish(granted < heapLimit * 2);
+                }, function() { finish(false); });
+            } else if (navigator.storage && navigator.storage.getDirectory) {
+                navigator.storage.getDirectory().then(function() { finish(false); }, function(e) {
+                    var msg = e instanceof Error ? e.message : String(e);
+                    finish(msg.includes('Security error') || msg.includes('unknown transient reason'));
+                });
+            } else {
+                finish(false);
+            }
+
+            setTimeout(function() { finish(false); }, 3000);
+        });
+
+        window.__incognitoCheck.then(function(isPrivate) {
+            window.__incognito = isPrivate;
+            if (isPrivate) showIncognitoOverlay();
+        });
+    })();
+    </script>
 </head>
 <body>
     <div class="app" id="app">
