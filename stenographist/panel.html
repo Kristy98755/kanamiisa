@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanamiisa — Панель управления</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        .header {
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 18px;
+            font-weight: 500;
+        }
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        .header-btn {
+            padding: 8px 16px;
+            background: #333;
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .header-btn:hover {
+            background: #444;
+        }
+        .header-btn.primary {
+            background: #4CAF50;
+        }
+        .header-btn.primary:hover {
+            background: #45a049;
+        }
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #333;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+        }
+        .tab:hover {
+            color: #fff;
+        }
+        .tab.active {
+            color: #4CAF50;
+            border-bottom-color: #4CAF50;
+        }
+        .tab-panel {
+            display: none;
+        }
+        .tab-panel.active {
+            display: block;
+        }
+        .card {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .form-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .form-group {
+            flex: 1;
+        }
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary {
+            background: #4CAF50;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: #45a049;
+        }
+        .btn-danger {
+            background: #5a2a2a;
+            color: #ff6b6b;
+        }
+        .btn-danger:hover {
+            background: #6a3a3a;
+        }
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        th {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        td {
+            font-size: 14px;
+        }
+        tr:hover {
+            background: #1a1a1a;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #555;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #333;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #888;
+        }
+        .badge.root {
+            background: #2a3a2a;
+            color: #4CAF50;
+        }
+        .error-message {
+            padding: 12px;
+            background: #3a1a1a;
+            border: 1px solid #5a2a2a;
+            border-radius: 8px;
+            color: #ff6b6b;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        .device-info {
+            font-size: 12px;
+            color: #888;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Панель управления</h1>
+        <div class="header-actions">
+            <a href="/stenographist/" class="header-btn">Стеноgrafист</a>
+            <button class="header-btn" id="logout-btn">Выйти</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="tabs">
+            <button class="tab active" data-tab="users">Пользователи</button>
+            <button class="tab" data-tab="logs">История входов</button>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="users-panel" class="tab-panel active">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Учётные записи</span>
+                </div>
+
+                <div id="users-error" class="error-message" style="display: none;"></div>
+
+                <form id="create-user-form" style="margin-bottom: 24px;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Имя пользователя</label>
+                            <input type="text" id="new-username" placeholder="user" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Пароль</label>
+                            <input type="password" id="new-password" placeholder="••••••••" required>
+                        </div>
+                        <div style="display: flex; align-items: flex-end;">
+                            <button type="submit" class="btn btn-primary">Создать</button>
+                        </div>
+                    </div>
+                </form>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Пользователь</th>
+                            <th>Роль</th>
+                            <th>Создан</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table">
+                        <tr>
+                            <td colspan="4" class="empty-state">Загрузка...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Logs Tab -->
+        <div id="logs-panel" class="tab-panel">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">История входов</span>
+                    <button class="btn btn-sm" id="refresh-logs-btn" style="background: #333; color: #fff;">Обновить</button>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Время</th>
+                            <th>Пользователь</th>
+                            <th>IP</th>
+                            <th>Устройство</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-table">
+                        <tr>
+                            <td colspan="4" class="empty-state">Загрузка...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check auth
+        const isRoot = sessionStorage.getItem('is_root') === 'true';
+        if (!isRoot) {
+            window.location.href = '/login';
+        }
+
+        // Tab switching
+        const tabs = document.querySelectorAll('.tab');
+        const panels = document.querySelectorAll('.tab-panel');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                panels.forEach(p => p.classList.remove('active'));
+
+                tab.classList.add('active');
+                document.getElementById(`${tab.dataset.tab}-panel`).classList.add('active');
+            });
+        });
+
+        // Load users
+        async function loadUsers() {
+            try {
+                const res = await fetch('/stenographist/api/users');
+                if (!res.ok) throw new Error('Failed to load users');
+
+                const data = await res.json();
+                const tbody = document.getElementById('users-table');
+
+                if (!data.users || data.users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Нет пользователей</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.users.map(user => `
+                    <tr>
+                        <td>${escapeHtml(user.username)}</td>
+                        <td><span class="badge ${user.username === 'kanamiisa' ? 'root' : ''}">${user.username === 'kanamiisa' ? 'Root' : 'Гость'}</span></td>
+                        <td>${new Date(user.created_at).toLocaleDateString('ru-RU')}</td>
+                        <td>
+                            ${user.username !== 'kanamiisa' ? `
+                                <button class="btn btn-danger btn-sm" onclick="deleteUser('${escapeHtml(user.username)}')">Удалить</button>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                console.error('Failed to load users:', err);
+            }
+        }
+
+        // Create user
+        document.getElementById('create-user-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('new-username').value.trim();
+            const password = document.getElementById('new-password').value;
+
+            if (!username || !password) {
+                showError('users-error', 'Заполните все поля');
+                return;
+            }
+
+            try {
+                const res = await fetch('/stenographist/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    showError('users-error', data.error || 'Ошибка');
+                    return;
+                }
+
+                document.getElementById('new-username').value = '';
+                document.getElementById('new-password').value = '';
+                hideError('users-error');
+                loadUsers();
+            } catch (err) {
+                showError('users-error', 'Ошибка сети');
+            }
+        });
+
+        // Delete user
+        async function deleteUser(username) {
+            if (!confirm(`Удалить пользователя ${username}?`)) return;
+
+            try {
+                const res = await fetch(`/stenographist/api/users/${encodeURIComponent(username)}`, {
+                    method: 'DELETE'
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    alert(data.error || 'Ошибка');
+                    return;
+                }
+
+                loadUsers();
+            } catch (err) {
+                alert('Ошибка сети');
+            }
+        }
+
+        // Load logs
+        async function loadLogs() {
+            try {
+                const res = await fetch('/stenographist/api/logs');
+                if (!res.ok) throw new Error('Failed to load logs');
+
+                const data = await res.json();
+                const tbody = document.getElementById('logs-table');
+
+                if (!data.logs || data.logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Нет записей</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.logs.map(log => `
+                    <tr>
+                        <td>${new Date(log.session_start).toLocaleString('ru-RU')}</td>
+                        <td>${escapeHtml(log.username)}</td>
+                        <td>${escapeHtml(log.ip || '-')}</td>
+                        <td><div class="device-info" title="${escapeHtml(log.user_agent || '')}">${escapeHtml(log.device?.platform || '-')} / ${escapeHtml(log.device?.browser || '-')}</div></td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                console.error('Failed to load logs:', err);
+            }
+        }
+
+        // Refresh logs button
+        document.getElementById('refresh-logs-btn').addEventListener('click', loadLogs);
+
+        // Logout
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            try {
+                await fetch('/login/api/logout', { method: 'POST' });
+            } catch (err) {}
+
+            sessionStorage.clear();
+            window.location.href = '/login';
+        });
+
+        // Helpers
+        function showError(id, message) {
+            const el = document.getElementById(id);
+            el.textContent = message;
+            el.style.display = 'block';
+        }
+
+        function hideError(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Initial load
+        loadUsers();
+        loadLogs();
+    </script>
+</body>
+</html>

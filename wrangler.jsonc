@@ -1,14 +1,22 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kanamiisa",
+  "main": "worker/index.js",
   "compatibility_date": "2026-06-21",
   "observability": {
     "enabled": true
   },
   "assets": {
     "directory": ".",
-    "ignore": [".git/**", ".wrangler/**", "node_modules/**"]
+    "binding": "ASSETS",
+    "run_worker_first": true
   },
+  "kv_namespaces": [
+    {
+      "binding": "AUTH_KV",
+      "id": "072e1df22e17491287febbc77eb72e47"
+    }
+  ],
   "compatibility_flags": [
     "nodejs_compat"
   ]
