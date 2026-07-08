@@ -1233,114 +1233,43 @@ async function collectAllClientInfo() {
     };
   } catch (e) {}
 
-  // Incognito / Private mode detection (detectincognitojs v1.7.0)
-  // https://github.com/Joe12387/detectIncognito - MIT License
+  // Incognito / Private mode detection
+  // Chromium: webkitTemporaryStorage quota (not faked by Chrome)
+  // Firefox: OPFS probe → Security error
+  // Safari: OPFS probe → "unknown transient reason"
   try {
     info.incognito = await new Promise((resolve) => {
       let settled = false;
-      function callback(isPrivate) {
-        if (settled) return;
-        settled = true;
-        resolve(isPrivate);
-      }
+      function done(val) { if (!settled) { settled = true; resolve(val); } }
 
-      function identifyChromium() {
-        const ua = navigator.userAgent;
-        if (ua.match(/Chrome/)) {
-          if (navigator.brave !== undefined) return 'Brave';
-          if (ua.match(/Edg/)) return 'Edge';
-          if (ua.match(/OPR/)) return 'Opera';
-          return 'Chrome';
-        }
-        return 'Chromium';
-      }
+      const ua = navigator.userAgent;
+      const isChromium = !!window.webkitRequestFileSystem || (ua.includes('Chrome') && !ua.includes('Edg') && !ua.includes('OPR'));
+      const isFirefox = ua.includes('Firefox') && !ua.includes('Seamonkey');
+      const isSafari = !isChromium && !isFirefox && /Safari/.test(ua) && !navigator.brave;
 
-      function feid() {
-        let id = 0;
-        try { parseInt('-1').toFixed(parseInt('-1')); } catch (e) { id = e.message.length; }
-        return id;
-      }
-
-      function isSafari() { const id = feid(); return id === 44 || id === 43; }
-      function isChrome() { return feid() === 51; }
-      function isFirefox() { return feid() === 25; }
-      function isMSIE() { return navigator.msSaveBlob !== undefined; }
-
-      // Safari: OPFS probe → "unknown transient reason" in private
-      async function safariTest() {
-        if (typeof navigator.storage?.getDirectory === 'function') {
-          try {
-            await navigator.storage.getDirectory();
-            callback(false);
-          } catch (e) {
+      if (isChromium && navigator.webkitTemporaryStorage && navigator.webkitTemporaryStorage.queryUsageAndQuota) {
+        // Chrome: incognito quota is memory-bound (~2x heap limit), normal is disk-bound (huge)
+        navigator.webkitTemporaryStorage.queryUsageAndQuota(
+          (used, granted) => {
+            const heapLimit = performance.memory ? performance.memory.jsHeapSizeLimit : 2 * 1024 * 1024 * 1024;
+            done(granted < heapLimit * 2);
+          },
+          () => done(false)
+        );
+      } else if (navigator.storage && navigator.storage.getDirectory) {
+        // Firefox / Safari: OPFS probe
+        navigator.storage.getDirectory().then(
+          () => done(false),
+          (e) => {
             const msg = e instanceof Error ? e.message : String(e);
-            callback(msg.includes('unknown transient reason'));
+            done(msg.includes('Security error') || msg.includes('unknown transient reason'));
           }
-        } else if (navigator.maxTouchPoints !== undefined) {
-          // Safari 13-18: indexedDB Blob test
-          const tmp = String(Math.random());
-          try {
-            const dbReq = indexedDB.open(tmp, 1);
-            dbReq.onupgradeneeded = (ev) => {
-              const db = ev.target.result;
-              try {
-                db.createObjectStore('t', { autoIncrement: true }).put(new Blob());
-                callback(false);
-              } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
-                callback(msg.includes('are not yet supported'));
-              } finally {
-                db.close();
-                indexedDB.deleteDatabase(tmp);
-              }
-            };
-            dbReq.onerror = () => callback(false);
-          } catch { callback(false); }
-        } else {
-          // Old Safari: openDatabase + localStorage
-          try { window.openDatabase(null, null, null, null); } catch { callback(true); return; }
-          try { localStorage.setItem('t', '1'); localStorage.removeItem('t'); } catch { callback(true); return; }
-          callback(false);
-        }
+        );
+      } else {
+        done(false);
       }
 
-      // Chrome: OPFS flush timing (incognito = in-memory = fast flush)
-      function chromeTest() {
-        const src = `(async()=>{try{const r=await navigator.storage.getDirectory(),f=await(await r.getFileHandle('_',{create:true})).createSyncAccessHandle(),b=new Uint8Array(1);let m=1/0;for(let i=0;i<3;i++){f.write(b,{at:0});const s=performance.now();f.flush();const dt=performance.now()-s;if(dt<m)m=dt}f.close();postMessage(m<.1)}catch{postMessage(false)}})()`;
-        const w = new Worker(URL.createObjectURL(new Blob([src])));
-        w.onmessage = (e) => { w.terminate(); callback(e.data); };
-        setTimeout(() => callback(false), 2000);
-      }
-
-      // Firefox: OPFS probe → "Security error" in private
-      async function firefoxTest() {
-        if (typeof navigator.storage?.getDirectory === 'function') {
-          try {
-            await navigator.storage.getDirectory();
-            callback(false);
-          } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
-            callback(msg.includes('Security error'));
-          }
-        } else {
-          const req = indexedDB.open('inPrivate');
-          req.onerror = () => callback(true);
-          req.onsuccess = () => { indexedDB.deleteDatabase('inPrivate'); callback(false); };
-        }
-      }
-
-      // MSIE: no indexedDB
-      function msieTest() { callback(window.indexedDB === undefined); }
-
-      (async () => {
-        if (isSafari()) await safariTest();
-        else if (isChrome()) chromeTest();
-        else if (isFirefox()) await firefoxTest();
-        else if (isMSIE()) msieTest();
-        else callback(false);
-      })().catch(() => callback(false));
-
-      setTimeout(() => callback(false), 3000);
+      setTimeout(() => done(false), 3000);
     });
   } catch (e) {
     info.incognito = false;
