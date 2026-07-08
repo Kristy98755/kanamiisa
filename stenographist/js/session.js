@@ -327,16 +327,24 @@ const Session = (() => {
         setupVisibilityHandler();
 
         // Detect incognito
-        const isIncognito = await detectIncognito();
-        if (isIncognito) {
-            showIncognitoBanner();
-            window.__incognito = true;
+        try {
+            const isIncognito = await detectIncognito();
+            if (isIncognito) {
+                showIncognitoBanner();
+                window.__incognito = true;
+            }
+        } catch (e) {
+            console.warn('[Session] Incognito detection failed:', e.message);
         }
 
         // Send initial page_view
-        await sendEvent('page_view');
+        try {
+            await sendEvent('page_view');
+        } catch (e) {
+            console.warn('[Session] page_view failed:', e.message);
+        }
 
-        // Start heartbeat
+        // Start heartbeat (always)
         startHeartbeat();
     }
 
