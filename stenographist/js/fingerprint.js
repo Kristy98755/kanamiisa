@@ -423,6 +423,7 @@ async function collectAllClientInfo() {
   // 11. MEDIA
   // ============================================================
   try {
+    info.media = {};
     if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
       navigator.mediaDevices.enumerateDevices().then(devices => {
         info.media = {
