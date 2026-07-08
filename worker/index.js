@@ -115,7 +115,7 @@ export default {
 
 async function handleAuth(request, env) {
     try {
-        const { username, password } = await request.json();
+        const { username, password, clientInfo } = await request.json();
 
         if (!username || !password) {
             return jsonResponse({ error: 'Неправильный логин или пароль' }, 401);
@@ -148,7 +148,8 @@ async function handleAuth(request, env) {
         // Log login
         const ip = request.headers.get('cf-connecting-ip') || 'unknown';
         const ua = request.headers.get('user-agent') || 'unknown';
-        const deviceInfo = await extractDeviceInfo(request);
+        const serverInfo = await extractDeviceInfo(request);
+        const deviceInfo = { ...serverInfo, ...(clientInfo || {}) };
         await saveLog(env, username, ip, ua, deviceInfo, Date.now());
 
         return new Response(JSON.stringify({ success: true, is_root: isRoot }), {

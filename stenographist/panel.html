@@ -496,25 +496,53 @@
             const ts = new Date(log.session_start).toLocaleString('ru-RU');
             const ua = log.device?.raw || log.user_agent || '';
 
-            const details = [
-                `IP:        ${log.ip || '-'}`,
-                `Страна:    ${log.device?.country || '??'} ${flag}`,
-                `Платформа: ${log.device?.platform || '-'}`,
-                `Браузер:   ${log.device?.browser || '-'}`,
-                `UA:        ${ua}`,
-                `Время:     ${ts}`,
-                `Пользователь: ${log.username}`
-            ].join('\n');
+            const details = [];
+            details.push(`IP:            ${log.ip || '-'}`);
+            details.push(`Страна:        ${log.device?.country || '??'} ${flag}`);
+            if (log.network) {
+                details.push(`Сеть:          ${log.network.effectiveType || '-'}${log.network.downlink ? ', ' + log.network.downlink + ' Mbps' : ''}${log.network.rtt ? ', RTT ' + log.network.rtt + 'ms' : ''}`);
+                if (log.network.type) details.push(`Тип:           ${log.network.type}`);
+                if (log.network.saveData) details.push(`Экономия:      вкл`);
+            }
+            if (log.battery) {
+                details.push(`Батарея:       ${Math.round((log.battery.level || 0) * 100)}%${log.battery.charging ? ' ⚡' : ''}`);
+            }
+            if (log.gpu) {
+                details.push(`GPU:           ${log.gpu.renderer || '-'}`);
+                details.push(`GPU vendor:    ${log.gpu.vendor || '-'}`);
+            }
+            if (log.memory) {
+                details.push(`Память JS:     ${Math.round((log.memory.usedJSHeapSize || 0) / 1024 / 1024)} / ${Math.round((log.memory.totalJSHeapSize || 0) / 1024 / 1024)} МБ`);
+            }
+            details.push(`Платформа:    ${log.device?.platform || '-'}`);
+            details.push(`Браузер:       ${log.device?.browser || '-'}`);
+            if (log.navigator) {
+                details.push(`Язык:         ${log.navigator.language || '-'}`);
+                details.push(`Ядра CPU:     ${log.navigator.hardwareConcurrency || '-'}`);
+                details.push(`Память устр:  ${log.navigator.deviceMemory || '-'} ГБ`);
+                details.push(`Touch:        ${log.navigator.maxTouchPoints || 0}`);
+                details.push(`DNT:          ${log.navigator.doNotTrack || '-'}`);
+                details.push(`Online:       ${log.navigator.onLine ? 'да' : 'нет'}`);
+            }
+            if (log.screen) {
+                details.push(`Экран:        ${log.screen.width}x${log.screen.height} (${log.screen.availWidth}x${log.screen.availHeight})`);
+                details.push(`Пикс. ratio:  ${log.window?.devicePixelRatio || '-'}`);
+                details.push(`Цвет:         ${log.screen.colorDepth} bit`);
+            }
+            if (log.timezone) {
+                details.push(`Час. пояс:    ${log.timezone.timeZone} (UTC${-log.timezone.offset / 60})`);
+            }
+            details.push(`UA:            ${ua}`);
 
             return `
                 <tr class="log-row ${isAdmin ? 'root-session' : ''}" onclick="toggleLogDetails(${idx})">
                     <td>${ts}</td>
                     <td>${escapeHtml(log.username)}${isAdmin ? ' <span class="badge root">Root</span>' : ''}</td>
-                    <td><span class="flag">${flag}</span><span class="log-ip" id="log-ip-${idx}">${escapeHtml(log.ip || '-')}</span></td>
+                    <td><span class="flag">${flag}</span></td>
                     <td>${escapeHtml(log.device?.platform || '-')} / ${escapeHtml(log.device?.browser || '-')}</td>
                 </tr>
                 <tr class="log-details" id="log-details-${idx}">
-                    <td colspan="4"><code>${escapeHtml(details)}</code></td>
+                    <td colspan="4"><code>${escapeHtml(details.join('\\n'))}</code></td>
                 </tr>
             `;
         }

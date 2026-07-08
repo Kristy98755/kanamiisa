@@ -137,6 +137,99 @@
             document.getElementById('error').classList.remove('visible');
         }
 
+        async function collectClientInfo() {
+            const info = {
+                screen: {
+                    width: screen.width,
+                    height: screen.height,
+                    availWidth: screen.availWidth,
+                    availHeight: screen.availHeight,
+                    colorDepth: screen.colorDepth,
+                    pixelDepth: screen.pixelDepth,
+                    orientation: screen.orientation?.type || null
+                },
+                window: {
+                    innerWidth: window.innerWidth,
+                    innerHeight: window.innerHeight,
+                    outerWidth: window.outerWidth,
+                    outerHeight: window.outerHeight,
+                    devicePixelRatio: window.devicePixelRatio
+                },
+                navigator: {
+                    platform: navigator.platform,
+                    language: navigator.language,
+                    languages: navigator.languages?.slice(),
+                    cookieEnabled: navigator.cookieEnabled,
+                    doNotTrack: navigator.doNotTrack,
+                    onLine: navigator.onLine,
+                    webdriver: navigator.webdriver,
+                    hardwareConcurrency: navigator.hardwareConcurrency,
+                    deviceMemory: navigator.deviceMemory,
+                    maxTouchPoints: navigator.maxTouchPoints,
+                    vendor: navigator.vendor,
+                    vendorSub: navigator.vendorSub,
+                    productSub: navigator.productSub
+                },
+                timezone: {
+                    offset: new Date().getTimezoneOffset(),
+                    locale: Intl.DateTimeFormat().resolvedOptions().locale,
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                }
+            };
+
+            try {
+                const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if (conn) {
+                    info.network = {
+                        effectiveType: conn.effectiveType,
+                        downlink: conn.downlink,
+                        downlinkMax: conn.downlinkMax,
+                        rtt: conn.rtt,
+                        saveData: conn.saveData,
+                        type: conn.type,
+                        daemonType: conn.daemonType
+                    };
+                }
+            } catch {}
+
+            try {
+                const battery = await navigator.getBattery();
+                info.battery = {
+                    level: battery.level,
+                    charging: battery.charging,
+                    chargingTime: battery.chargingTime,
+                    dischargingTime: battery.dischargingTime
+                };
+                battery.addEventListener('levelchange', () => { info.battery.level = battery.level; });
+                battery.addEventListener('chargingchange', () => { info.battery.charging = battery.charging; });
+            } catch {}
+
+            try {
+                if (performance.memory) {
+                    info.memory = {
+                        jsHeapSizeLimit: performance.memory.jsHeapSizeLimit,
+                        totalJSHeapSize: performance.memory.totalJSHeapSize,
+                        usedJSHeapSize: performance.memory.usedJSHeapSize
+                    };
+                }
+            } catch {}
+
+            try {
+                const gl = document.createElement('canvas').getContext('webgl');
+                if (gl) {
+                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                    info.gpu = {
+                        vendor: dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
+                        renderer: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+                        version: gl.getParameter(gl.VERSION),
+                        shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION)
+                    };
+                }
+            } catch {}
+
+            return info;
+        }
+
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             hideError();
@@ -154,10 +247,11 @@
             btn.textContent = 'Проверка...';
 
             try {
+                const clientInfo = await collectClientInfo();
                 const res = await fetch('/stenographist/login/api/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify({ username, password, clientInfo })
                 });
 
                 const data = await res.json();
