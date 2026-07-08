@@ -98,7 +98,7 @@
             const res = await fetch('/stenographist/api/session');
             if (!res.ok) return;
             const data = await res.json();
-            if (data.is_root) {
+            if (data.valid && data.role === 'root') {
                 const btn = document.createElement('a');
                 btn.href = '/stenographist/panel.html';
                 btn.className = 'header__admin-btn';

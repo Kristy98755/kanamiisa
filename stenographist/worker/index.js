@@ -50,6 +50,9 @@ export default {
         if (request.method === 'POST' && path === '/stenographist/api/session/kill') {
             return handleKillSession(request, env);
         }
+        if (request.method === 'GET' && path === '/stenographist/api/logs') {
+            return handleGetLogs(request, env);
+        }
 
         // --- Audio processing (auth required) ---
         if (request.method === 'POST' && path === '/stenographist/api/process') {
@@ -390,6 +393,72 @@ async function handleKillSession(request, env) {
         console.error('KillSession error:', err);
         return jsonResponse({ error: err.message }, 500, env);
     }
+}
+
+// --- Get logs (admin) - compatible with panel.html format ---
+async function handleGetLogs(request, env) {
+    try {
+        const sessionId = getSessionId(request);
+        if (!sessionId) {
+            return jsonResponse({ error: 'No session' }, 401, env);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (!session || session.role !== 'root') {
+            return jsonResponse({ error: 'Forbidden' }, 403, env);
+        }
+
+        // List all sessions and format for panel.html
+        const list = await env.AUTH_KV.list({ prefix: 'session:' });
+        const logs = [];
+
+        for (const key of list.keys) {
+            const s = await env.AUTH_KV.get(key.name, 'json');
+            if (s) {
+                const fp = s.fingerprint || {};
+                logs.push({
+                    session_id: s.id,
+                    username: s.username,
+                    ip: s.ip,
+                    device: {
+                        country: s.country,
+                        platform: fp.navigator?.platform || fp.navigator?.userAgentData?.platform || '-',
+                        browser: parseBrowser(fp.navigator?.userAgent),
+                        raw: s.userAgent
+                    },
+                    user_agent: s.userAgent,
+                    session_start: s.created,
+                    network: fp.network || fp.navigator?.connection || null,
+                    battery: fp.battery || null,
+                    gpu: fp.webgl || null,
+                    memory: fp.memory || fp.cpu || null,
+                    navigator: fp.navigator || null,
+                    screen: fp.screen || null,
+                    window: fp.window || null,
+                    timezone: fp.datetime || fp.intl || null,
+                    failedAttempts: s.failedAttempts || 0,
+                    active: (Date.now() - new Date(s.lastSeen).getTime()) < 120000
+                });
+            }
+        }
+
+        // Sort by session_start descending
+        logs.sort((a, b) => new Date(b.session_start) - new Date(a.session_start));
+
+        return jsonResponse({ logs }, 200, env);
+    } catch (err) {
+        console.error('GetLogs error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
+}
+
+function parseBrowser(ua) {
+    if (!ua) return '-';
+    if (ua.includes('Firefox')) return 'Firefox';
+    if (ua.includes('Edg')) return 'Edge';
+    if (ua.includes('Chrome')) return 'Chrome';
+    if (ua.includes('Safari')) return 'Safari';
+    return ua.split(' ').pop() || '-';
 }
 
 // ============================================================

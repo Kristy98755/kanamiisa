@@ -161,6 +161,7 @@ const Session = (() => {
 
         const overlay = document.createElement('div');
         overlay.id = 'session-overlay';
+        overlay.className = 'session-overlay';
         overlay.innerHTML = `
             <div class="session-overlay__content">
                 <p class="session-overlay__text">Сессия приостановлена</p>
