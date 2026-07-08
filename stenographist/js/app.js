@@ -86,11 +86,11 @@
         }
 
         // Initialize session management
-        Session.init().catch(e => {
+        Session.init().then(() => {
+            checkAdminSession();
+        }).catch(e => {
             console.warn('[Stenographist] Session init failed:', e.message);
         });
-
-        checkAdminSession();
     }
 
     async function checkAdminSession() {

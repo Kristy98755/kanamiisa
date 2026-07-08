@@ -136,19 +136,28 @@ const Session = (() => {
     }
 
     function onTabVisible() {
+        // Don't auto-hide overlay - user must click "Продолжить"
+        // Only check timeout
         const inactiveSince = getCookie('inactive_since');
-
         if (inactiveSince) {
             const elapsed = Date.now() - parseInt(inactiveSince);
-
             if (elapsed > INACTIVE_TIMEOUT) {
-                // Too long — logout
+                logout();
+                return;
+            }
+        }
+    }
+
+    function onResume() {
+        const inactiveSince = getCookie('inactive_since');
+        if (inactiveSince) {
+            const elapsed = Date.now() - parseInt(inactiveSince);
+            if (elapsed > INACTIVE_TIMEOUT) {
                 logout();
                 return;
             }
         }
 
-        // Resume
         deleteCookie('inactive_since');
         hideOverlay();
         startHeartbeat();
@@ -171,7 +180,7 @@ const Session = (() => {
         document.body.appendChild(overlay);
 
         document.getElementById('sessionResumeBtn').addEventListener('click', () => {
-            onTabVisible();
+            onResume();
         });
     }
 
