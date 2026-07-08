@@ -295,10 +295,19 @@
     </div>
 
     <script>
-        // Check auth
-        const isRoot = sessionStorage.getItem('is_root') === 'true';
-        if (!isRoot) {
-            window.location.href = '/stenographist/login';
+        // Check auth (server-side)
+        async function checkAuth() {
+            try {
+                const res = await fetch('/stenographist/api/session');
+                if (!res.ok || !(await res.json()).is_root) {
+                    window.location.href = '/stenographist/login';
+                    return false;
+                }
+                return true;
+            } catch {
+                window.location.href = '/stenographist/login';
+                return false;
+            }
         }
 
         // Tab switching
@@ -460,8 +469,12 @@
         }
 
         // Initial load
-        loadUsers();
-        loadLogs();
+        checkAuth().then(ok => {
+            if (ok) {
+                loadUsers();
+                loadLogs();
+            }
+        });
     </script>
 </body>
 </html>
