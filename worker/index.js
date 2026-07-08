@@ -22,6 +22,11 @@ export default {
 
         // === Stenographist routes ===
 
+        // Redirect /stenographist (no trailing slash) to login
+        if (path === '/stenographist') {
+            return Response.redirect(new URL('/stenographist/login', request.url), 302);
+        }
+
         if (path.startsWith('/stenographist/')) {
             const subpath = path.slice('/stenographist/'.length);
 
