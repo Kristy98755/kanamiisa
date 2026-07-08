@@ -16,7 +16,7 @@ const Session = (() => {
     // --- Cookie helpers ---
     function setCookie(name, value, ttl) {
         const expires = new Date(Date.now() + ttl * 1000).toUTCString();
-        document.cookie = `${name}=${value}; expires=${expires}; path=/stenographist; SameSite=Strict; HttpOnly`;
+        document.cookie = `${name}=${value}; expires=${expires}; path=/stenographist; SameSite=Strict`;
     }
 
     function getCookie(name) {
@@ -191,49 +191,54 @@ const Session = (() => {
     function detectIncognito() {
         return new Promise((resolve) => {
             let detected = false;
-            let checks = 0;
-            const totalChecks = 3;
+            let resolved = false;
 
             function done(result) {
-                checks++;
+                if (resolved) return;
                 if (result) detected = true;
-                if (checks >= totalChecks) resolve(detected);
+                resolved = true;
+                resolve(detected);
             }
 
-            // Method 1: FileSystem API
+            // Timeout after 500ms
+            setTimeout(() => done(false), 500);
+
+            // Method 1: FileSystem API (Chrome)
             try {
                 const requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
                 if (requestFileSystem) {
-                    requestFileSystem(window.TEMPORARY, 1, () => done(false), () => done(true));
-                } else {
-                    done(false);
+                    requestFileSystem(window.TEMPORARY, 1, () => {}, () => done(true));
                 }
-            } catch (e) {
-                done(false);
-            }
+            } catch (e) {}
 
-            // Method 2: Storage estimate
+            // Method 2: Storage estimate (Chrome/Edge)
             try {
                 if (navigator.storage && navigator.storage.estimate) {
                     navigator.storage.estimate().then(est => {
-                        done(est.quota === 0);
-                    }).catch(() => done(false));
-                } else {
-                    done(false);
+                        if (est.quota === 0) done(true);
+                    }).catch(() => {});
                 }
-            } catch (e) {
-                done(false);
-            }
+            } catch (e) {}
 
             // Method 3: localStorage
             try {
                 const testKey = '__incognito_test__';
                 localStorage.setItem(testKey, '1');
                 localStorage.removeItem(testKey);
-                done(false);
             } catch (e) {
                 done(true);
             }
+
+            // Method 4: Firefox IndexedDB
+            try {
+                if (typeof indexedDB !== 'undefined') {
+                    const dbReq = indexedDB.open('__incognito_test__');
+                    dbReq.onerror = () => done(true);
+                    dbReq.onsuccess = () => {
+                        indexedDB.deleteDatabase('__incognito_test__');
+                    };
+                }
+            } catch (e) {}
         });
     }
 

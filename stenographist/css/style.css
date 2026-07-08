@@ -103,6 +103,31 @@ body {
     color: #fff;
 }
 
+.header__right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header__logout-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: color var(--transition), background var(--transition);
+}
+
+.header__logout-btn:hover {
+    color: var(--color-danger);
+    background: var(--color-danger-dim);
+}
+
 /* Layout */
 .layout {
     display: flex;
