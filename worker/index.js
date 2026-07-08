@@ -1,6 +1,6 @@
 /**
  * Kanamiisa Worker — Main entry point
- * Handles routing, auth, and serves static files
+ * Handles routing, auth, session management, and serves static files
  */
 
 import { verify, generateSecret, generateURI } from './totp.js';
@@ -22,7 +22,6 @@ export default {
 
         // === Stenographist routes ===
 
-        // Redirect /stenographist (no trailing slash) to login
         if (path === '/stenographist') {
             return Response.redirect(new URL('/stenographist/login', request.url), 302);
         }
@@ -30,12 +29,14 @@ export default {
         if (path.startsWith('/stenographist/')) {
             const subpath = path.slice('/stenographist/'.length);
 
-            // Login page (no auth)
+            // --- No-auth routes ---
+
             if (subpath === 'login' || subpath === 'login/' || subpath === '') {
                 return serveFile(env, 'stenographist/login.html');
             }
-
-            // Auth API (no auth)
+            if (subpath === 'login/setup' || subpath === 'login/setup/') {
+                return serveFile(env, 'stenographist/login/setup.html');
+            }
             if (subpath === 'login/api/auth' && request.method === 'POST') {
                 return handleAuth(request, env);
             }
@@ -49,61 +50,66 @@ export default {
                 return handleGetSecret(request, env);
             }
 
-            // TOTP setup page (cheat code protected, no session)
-            if (subpath === 'login/setup' || subpath === 'login/setup/') {
-                return serveFile(env, 'stenographist/login/setup.html');
+            // --- Session tracking (no auth, uses session_id cookie) ---
+            if (subpath === 'api/event' && request.method === 'POST') {
+                return handleEvent(request, env);
+            }
+            if (subpath === 'api/fingerprint' && request.method === 'POST') {
+                return handleFingerprint(request, env);
+            }
+            if (subpath === 'api/logout' && request.method === 'POST') {
+                return handleNewLogout(request, env);
+            }
+            if (subpath === 'api/session' && request.method === 'GET') {
+                return handleGetSession(request, env);
             }
 
-            // Everything else requires auth
+            // --- Admin session endpoints (session_id cookie, role-based) ---
+            if (subpath === 'api/sessions' && request.method === 'GET') {
+                return handleGetSessions(request, env);
+            }
+            if (subpath === 'api/session/kill' && request.method === 'POST') {
+                return handleKillSession(request, env);
+            }
+
+            // --- Auth-required routes (old session cookie) ---
             const session = await validateSession(request, env);
 
             if (!session) {
                 return Response.redirect(new URL('/stenographist/login', request.url), 302);
             }
 
-            // Admin API
             if (subpath === 'api/users' && request.method === 'GET') {
                 if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
                 return handleListUsers(env);
             }
-
             if (subpath === 'api/users' && request.method === 'POST') {
                 if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
                 return handleCreateUser(request, env);
             }
-
             if (subpath.match(/^api\/users\/[^/]+$/) && request.method === 'DELETE') {
                 if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
                 const username = subpath.split('/').pop();
                 return handleDeleteUser(username, env);
             }
-
             if (subpath.match(/^api\/users\/[^/]+$/) && request.method === 'PUT') {
                 if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
                 const username = subpath.split('/').pop();
                 return handleUpdatePassword(username, request, env);
             }
-
             if (subpath === 'api/logs' && request.method === 'GET') {
                 if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
                 return handleListLogs(env);
             }
-
-            // Stenographist API (audio processing)
             if (subpath === 'api/process' && request.method === 'POST') {
                 return handleProcess(request, env);
             }
 
-            // Session info (for frontend)
-            if (subpath === 'api/session' && request.method === 'GET') {
-                return jsonResponse({ username: session.username, is_root: session.is_root });
-            }
-
-            // Static files (CSS, JS, HTML)
-            return serveFile(env, path.slice(1)); // Remove leading /
+            // Static files
+            return serveFile(env, path.slice(1));
         }
 
-        // Everything else: serve static files directly (no auth)
+        // Everything else: serve static files directly
         if (path === '/' || path === '') {
             return serveFile(env, 'index.html');
         }
@@ -111,7 +117,263 @@ export default {
     }
 };
 
-// === Auth Handlers ===
+// ============================================================
+// Stenographist Session Tracking (session_id cookie system)
+// ============================================================
+
+function getSessionId(request) {
+    const cookie = request.headers.get('Cookie') || '';
+    const match = cookie.match(/session_id=([^;]+)/);
+    return match ? match[1] : null;
+}
+
+function getIp(request) {
+    return request.headers.get('CF-Connecting-IP') || 'unknown';
+}
+
+function getCountry(request) {
+    return request.headers.get('CF-IPCountry') || 'unknown';
+}
+
+function getUserAgent(request) {
+    return request.headers.get('User-Agent') || 'unknown';
+}
+
+// --- Event endpoint (heartbeat, page_view, etc.) ---
+async function handleEvent(request, env) {
+    try {
+        const body = await request.json();
+        const { session_id, type, path: eventPath, timestamp, success, username } = body;
+
+        if (!session_id || !type) {
+            return jsonResponse({ error: 'Missing session_id or type' }, 400);
+        }
+
+        const ip = getIp(request);
+        const country = getCountry(request);
+
+        let session = await env.AUTH_KV.get(`session:${session_id}`, 'json');
+
+        if (!session) {
+            session = {
+                id: session_id,
+                created: new Date(timestamp).toISOString(),
+                lastSeen: new Date(timestamp).toISOString(),
+                ip,
+                country,
+                userAgent: getUserAgent(request),
+                username: null,
+                role: null,
+                failedAttempts: 0,
+                events: []
+            };
+        } else {
+            session.lastSeen = new Date(timestamp).toISOString();
+        }
+
+        session.events.push({
+            type,
+            ts: new Date(timestamp).toISOString(),
+            path: eventPath || null,
+            success: success !== undefined ? success : null,
+            username: username || null
+        });
+
+        if (session.events.length > 100) {
+            session.events = session.events.slice(-100);
+        }
+
+        await env.AUTH_KV.put(
+            `session:${session_id}`,
+            JSON.stringify(session),
+            { expirationTtl: 3600 }
+        );
+
+        return jsonResponse({ ok: true, session_id });
+    } catch (err) {
+        console.error('Event error:', err);
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+// --- Fingerprint endpoint ---
+async function handleFingerprint(request, env) {
+    try {
+        const { session_id, fingerprint } = await request.json();
+
+        if (!session_id || !fingerprint) {
+            return jsonResponse({ error: 'Missing session_id or fingerprint' }, 400);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${session_id}`, 'json');
+        if (!session) {
+            return jsonResponse({ error: 'Session not found' }, 404);
+        }
+
+        session.fingerprint = fingerprint;
+        await env.AUTH_KV.put(
+            `session:${session_id}`,
+            JSON.stringify(session),
+            { expirationTtl: 3600 }
+        );
+
+        return jsonResponse({ ok: true });
+    } catch (err) {
+        console.error('Fingerprint error:', err);
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+// --- Get session endpoint (returns both old and new formats) ---
+async function handleGetSession(request, env) {
+    try {
+        const sessionId = getSessionId(request);
+        if (!sessionId) {
+            return jsonResponse({ valid: false }, 200);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (!session) {
+            return jsonResponse({ valid: false }, 200);
+        }
+
+        return jsonResponse({
+            valid: true,
+            session_id: session.id,
+            created: session.created,
+            lastSeen: session.lastSeen,
+            username: session.username,
+            role: session.role,
+            is_root: session.role === 'root',
+            failedAttempts: session.failedAttempts || 0
+        });
+    } catch (err) {
+        console.error('GetSession error:', err);
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+// --- New logout endpoint (session_id cookie) ---
+async function handleNewLogout(request, env) {
+    try {
+        const sessionId = getSessionId(request);
+        if (!sessionId) {
+            return jsonResponse({ ok: true });
+        }
+
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (session && session.username) {
+            const listKey = `session_list:${session.username}`;
+            const list = await env.AUTH_KV.get(listKey, 'json') || [];
+            const newList = list.filter(id => id !== sessionId);
+            if (newList.length > 0) {
+                await env.AUTH_KV.put(listKey, JSON.stringify(newList), { expirationTtl: 3600 });
+            } else {
+                await env.AUTH_KV.delete(listKey);
+            }
+        }
+
+        await env.AUTH_KV.delete(`session:${sessionId}`);
+        await env.AUTH_KV.delete(`failed:${sessionId}`);
+
+        return jsonResponse({ ok: true });
+    } catch (err) {
+        console.error('Logout error:', err);
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+// --- Get sessions (admin) ---
+async function handleGetSessions(request, env) {
+    try {
+        const sessionId = getSessionId(request);
+        if (!sessionId) {
+            return jsonResponse({ error: 'No session' }, 401);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (!session || session.role !== 'root') {
+            return jsonResponse({ error: 'Forbidden' }, 403);
+        }
+
+        const list = await env.AUTH_KV.list({ prefix: 'session:' });
+        const sessions = [];
+
+        for (const key of list.keys) {
+            const s = await env.AUTH_KV.get(key.name, 'json');
+            if (s) {
+                const lastSeen = new Date(s.lastSeen).getTime();
+                const isActive = (Date.now() - lastSeen) < 120000;
+
+                sessions.push({
+                    session_id: s.id,
+                    username: s.username,
+                    ip: s.ip,
+                    country: s.country,
+                    userAgent: s.userAgent,
+                    lastSeen: s.lastSeen,
+                    created: s.created,
+                    failedAttempts: s.failedAttempts || 0,
+                    active: isActive,
+                    incognito: s.fingerprint?.incognito || false
+                });
+            }
+        }
+
+        return jsonResponse({ sessions });
+    } catch (err) {
+        console.error('GetSessions error:', err);
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+// --- Kill session (admin) ---
+async function handleKillSession(request, env) {
+    try {
+        const adminSessionId = getSessionId(request);
+        if (!adminSessionId) {
+            return jsonResponse({ error: 'No session' }, 401);
+        }
+
+        const adminSession = await env.AUTH_KV.get(`session:${adminSessionId}`, 'json');
+        if (!adminSession || adminSession.role !== 'root') {
+            return jsonResponse({ error: 'Forbidden' }, 403);
+        }
+
+        const { session_id } = await request.json();
+        if (!session_id) {
+            return jsonResponse({ error: 'Missing session_id' }, 400);
+        }
+
+        const targetSession = await env.AUTH_KV.get(`session:${session_id}`, 'json');
+        if (!targetSession) {
+            return jsonResponse({ error: 'Session not found' }, 404);
+        }
+
+        if (targetSession.username) {
+            const listKey = `session_list:${targetSession.username}`;
+            const list = await env.AUTH_KV.get(listKey, 'json') || [];
+            const newList = list.filter(id => id !== session_id);
+            if (newList.length > 0) {
+                await env.AUTH_KV.put(listKey, JSON.stringify(newList), { expirationTtl: 3600 });
+            } else {
+                await env.AUTH_KV.delete(listKey);
+            }
+        }
+
+        await env.AUTH_KV.delete(`session:${session_id}`);
+        await env.AUTH_KV.delete(`failed:${session_id}`);
+
+        return jsonResponse({ ok: true });
+    } catch (err) {
+        console.error('KillSession error:', err);
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+// ============================================================
+// Legacy Auth (old session cookie system for login.html)
+// ============================================================
 
 async function handleAuth(request, env) {
     try {
@@ -125,14 +387,12 @@ async function handleAuth(request, env) {
         let valid = false;
 
         if (username === 'kanamiisa') {
-            // Root user: password = TOTP code
             const secret = await getTOTPSecret(env);
             if (secret) {
                 valid = await verify(secret, password);
             }
             isRoot = true;
         } else {
-            // Guest user: password = account password
             const user = await getUser(env, username);
             if (user) {
                 valid = await verifyPassword(password, user.password_hash);
@@ -145,7 +405,28 @@ async function handleAuth(request, env) {
 
         const sessionId = await createSession(env, username, isRoot);
 
-        // Log login
+        // Also create/update stenographist session with role
+        const stenoSessionId = getSessionId(request);
+        if (stenoSessionId) {
+            const stenoSession = await env.AUTH_KV.get(`session:${stenoSessionId}`, 'json');
+            if (stenoSession) {
+                stenoSession.username = username;
+                stenoSession.role = isRoot ? 'root' : 'guest';
+                await env.AUTH_KV.put(
+                    `session:${stenoSessionId}`,
+                    JSON.stringify(stenoSession),
+                    { expirationTtl: 3600 }
+                );
+
+                const listKey = `session_list:${username}`;
+                const list = await env.AUTH_KV.get(listKey, 'json') || [];
+                if (!list.includes(stenoSessionId)) {
+                    list.push(stenoSessionId);
+                    await env.AUTH_KV.put(listKey, JSON.stringify(list), { expirationTtl: 3600 });
+                }
+            }
+        }
+
         const ip = request.headers.get('cf-connecting-ip') || 'unknown';
         const ua = request.headers.get('user-agent') || 'unknown';
         const serverInfo = await extractDeviceInfo(request);
@@ -221,7 +502,9 @@ async function handleGetSecret(request, env) {
     }
 }
 
-// === User Management ===
+// ============================================================
+// User Management
+// ============================================================
 
 async function handleListUsers(env) {
     const users = await listUsers(env);
@@ -279,20 +562,23 @@ async function handleUpdatePassword(username, request, env) {
     return jsonResponse({ success: true });
 }
 
-// === Logs ===
+// ============================================================
+// Logs
+// ============================================================
 
 async function handleListLogs(env) {
     const logs = await listLogs(env);
     return jsonResponse({ logs });
 }
 
-// === Device Info Extraction ===
+// ============================================================
+// Device Info Extraction
+// ============================================================
 
 async function extractDeviceInfo(request) {
     const ua = request.headers.get('user-agent') || '';
     const country = request.headers.get('cf-ipcountry') || '??';
 
-    // Basic device detection from User-Agent
     let platform = 'unknown';
     let browser = 'unknown';
 
@@ -310,7 +596,9 @@ async function extractDeviceInfo(request) {
     return { platform, browser, country, raw: ua };
 }
 
-// === Static File Serving ===
+// ============================================================
+// Static File Serving
+// ============================================================
 
 async function serveFile(env, path) {
     try {
@@ -324,10 +612,11 @@ async function serveFile(env, path) {
     }
 }
 
-// === Stenographist API (audio processing) ===
+// ============================================================
+// Audio Processing
+// ============================================================
 
 async function handleProcess(request, env) {
-    // Import from the old worker code
     try {
         const formData = await request.formData();
         const audioFile = formData.get('audio');
@@ -392,8 +681,6 @@ async function processFull(audioFile, env) {
     return jsonResponse({ transcript, medicalHistory });
 }
 
-// === Speech-to-Text ===
-
 async function transcribeAudio(audioFile, env) {
     if (env.AI) {
         try {
@@ -412,8 +699,6 @@ async function transcribeAudio(audioFile, env) {
 
     throw new Error('Speech-to-text service not configured.');
 }
-
-// === Medical History Generation ===
 
 async function generateMedicalHistory(transcript, env) {
     const systemPrompt = `Ты — медицинский ассистент. По givenному тексту записи врача или пациента, создай структурированную историю болезни.
@@ -501,7 +786,9 @@ function countWords(text) {
     return text.split(/\s+/).filter(w => w.length > 0).length;
 }
 
-// === Helpers ===
+// ============================================================
+// Helpers
+// ============================================================
 
 function corsHeaders() {
     return {
