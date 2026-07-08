@@ -289,6 +289,7 @@ async function handleListLogs(env) {
 
 async function extractDeviceInfo(request) {
     const ua = request.headers.get('user-agent') || '';
+    const country = request.headers.get('cf-ipcountry') || '??';
 
     // Basic device detection from User-Agent
     let platform = 'unknown';
@@ -305,7 +306,7 @@ async function extractDeviceInfo(request) {
     else if (ua.includes('Safari')) browser = 'Safari';
     else if (ua.includes('Edge')) browser = 'Edge';
 
-    return { platform, browser, raw: ua };
+    return { platform, browser, country, raw: ua };
 }
 
 // === Static File Serving ===

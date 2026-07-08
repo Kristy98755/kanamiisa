@@ -207,13 +207,33 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        .log-row { cursor: pointer; }
+        .log-row:hover { background: #1a1a1a; }
+        .log-row.root-session { background: rgba(0, 188, 212, 0.08); }
+        .log-row.root-session:hover { background: rgba(0, 188, 212, 0.12); }
+        .log-details {
+            display: none;
+            background: #111;
+            border-top: 1px solid #333;
+        }
+        .log-details.open { display: table-row; }
+        .log-details td {
+            padding: 16px 24px;
+            font-family: monospace;
+            font-size: 12px;
+            line-height: 1.8;
+            color: #aaa;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .flag { font-size: 16px; margin-right: 6px; vertical-align: middle; }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>Панель управления</h1>
         <div class="header-actions">
-            <a href="/stenographist/" class="header-btn">Стеноgrafист</a>
+            <a href="/stenographist/" class="header-btn">Stenographist</a>
             <button class="header-btn" id="logout-btn">Выйти</button>
         </div>
     </div>
@@ -459,17 +479,49 @@
                     return;
                 }
 
-                tbody.innerHTML = data.logs.map(log => `
-                    <tr>
-                        <td>${new Date(log.session_start).toLocaleString('ru-RU')}</td>
-                        <td>${escapeHtml(log.username)}</td>
-                        <td>${escapeHtml(log.ip || '-')}</td>
-                        <td><div class="device-info" title="${escapeHtml(log.user_agent || '')}">${escapeHtml(log.device?.platform || '-')} / ${escapeHtml(log.device?.browser || '-')}</div></td>
-                    </tr>
-                `).join('');
+                tbody.innerHTML = data.logs.map((log, i) => renderLogRow(log, i)).join('');
             } catch (err) {
                 console.error('Failed to load logs:', err);
             }
+        }
+
+        function countryCodeToFlag(cc) {
+            if (!cc || cc === '??') return '🌐';
+            return cc.toUpperCase().replace(/./g, c => String.fromCodePoint(0x1F1A5 + c.charCodeAt(0)));
+        }
+
+        function renderLogRow(log, idx) {
+            const isAdmin = log.username === 'kanamiisa';
+            const flag = countryCodeToFlag(log.device?.country);
+            const ts = new Date(log.session_start).toLocaleString('ru-RU');
+            const ua = log.device?.raw || log.user_agent || '';
+
+            const details = [
+                `IP:        ${log.ip || '-'}`,
+                `Страна:    ${log.device?.country || '??'} ${flag}`,
+                `Платформа: ${log.device?.platform || '-'}`,
+                `Браузер:   ${log.device?.browser || '-'}`,
+                `UA:        ${ua}`,
+                `Время:     ${ts}`,
+                `Пользователь: ${log.username}`
+            ].join('\n');
+
+            return `
+                <tr class="log-row ${isAdmin ? 'root-session' : ''}" onclick="toggleLogDetails(${idx})">
+                    <td>${ts}</td>
+                    <td>${escapeHtml(log.username)}${isAdmin ? ' <span class="badge root">Root</span>' : ''}</td>
+                    <td><span class="flag">${flag}</span><span class="log-ip" id="log-ip-${idx}">${escapeHtml(log.ip || '-')}</span></td>
+                    <td>${escapeHtml(log.device?.platform || '-')} / ${escapeHtml(log.device?.browser || '-')}</td>
+                </tr>
+                <tr class="log-details" id="log-details-${idx}">
+                    <td colspan="4"><code>${escapeHtml(details)}</code></td>
+                </tr>
+            `;
+        }
+
+        function toggleLogDetails(idx) {
+            const el = document.getElementById(`log-details-${idx}`);
+            el.classList.toggle('open');
         }
 
         // Refresh logs button
