@@ -347,7 +347,12 @@
         async function checkAuth() {
             try {
                 const res = await fetch('/stenographist/api/session');
-                if (!res.ok || !(await res.json()).is_root) {
+                if (!res.ok) {
+                    window.location.href = '/stenographist/login';
+                    return false;
+                }
+                const data = await res.json();
+                if (!data.valid || data.role !== 'root') {
                     window.location.href = '/stenographist/login';
                     return false;
                 }

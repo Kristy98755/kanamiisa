@@ -53,6 +53,23 @@ export default {
         if (request.method === 'GET' && path === '/stenographist/api/logs') {
             return handleGetLogs(request, env);
         }
+        if (request.method === 'GET' && path === '/stenographist/api/users') {
+            return handleGetUsers(request, env);
+        }
+        if (request.method === 'POST' && path === '/stenographist/api/users') {
+            return handleCreateUser(request, env);
+        }
+        if (request.method === 'DELETE' && path.startsWith('/stenographist/api/users/')) {
+            return handleDeleteUser(request, env);
+        }
+        if (request.method === 'PUT' && path.startsWith('/stenographist/api/users/')) {
+            return handleChangePassword(request, env);
+        }
+
+        // --- Legacy endpoints for panel.html compatibility ---
+        if (request.method === 'POST' && path === '/stenographist/login/api/logout') {
+            return handleLogout(request, env);
+        }
 
         // --- Audio processing (auth required) ---
         if (request.method === 'POST' && path === '/stenographist/api/process') {
@@ -459,6 +476,127 @@ function parseBrowser(ua) {
     if (ua.includes('Chrome')) return 'Chrome';
     if (ua.includes('Safari')) return 'Safari';
     return ua.split(' ').pop() || '-';
+}
+
+// --- Get users (admin) ---
+async function handleGetUsers(request, env) {
+    try {
+        const sessionId = getSessionId(request);
+        if (!sessionId) {
+            return jsonResponse({ error: 'No session' }, 401, env);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (!session || session.role !== 'root') {
+            return jsonResponse({ error: 'Forbidden' }, 403, env);
+        }
+
+        // Hardcoded users for demo
+        const users = [
+            { username: 'kanamiisa', created_at: Date.now() }
+        ];
+
+        return jsonResponse({ users }, 200, env);
+    } catch (err) {
+        console.error('GetUsers error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
+}
+
+// --- Create user (admin) ---
+async function handleCreateUser(request, env) {
+    try {
+        const sessionId = getSessionId(request);
+        if (!sessionId) {
+            return jsonResponse({ error: 'No session' }, 401, env);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (!session || session.role !== 'root') {
+            return jsonResponse({ error: 'Forbidden' }, 403, env);
+        }
+
+        const { username, password } = await request.json();
+        if (!username || !password) {
+            return jsonResponse({ error: 'Missing username or password' }, 400, env);
+        }
+
+        // Store user in KV
+        await env.AUTH_KV.put(`user:${username}`, JSON.stringify({
+            username,
+            password,
+            created_at: Date.now()
+        }), { expirationTtl: 86400 * 365 });
+
+        return jsonResponse({ ok: true, username }, 200, env);
+    } catch (err) {
+        console.error('CreateUser error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
+}
+
+// --- Delete user (admin) ---
+async function handleDeleteUser(request, env) {
+    try {
+        const sessionId = getSessionId(request);
+        if (!sessionId) {
+            return jsonResponse({ error: 'No session' }, 401, env);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (!session || session.role !== 'root') {
+            return jsonResponse({ error: 'Forbidden' }, 403, env);
+        }
+
+        const url = new URL(request.url);
+        const username = decodeURIComponent(url.pathname.split('/').pop());
+
+        if (username === 'kanamiisa') {
+            return jsonResponse({ error: 'Cannot delete root user' }, 400, env);
+        }
+
+        await env.AUTH_KV.delete(`user:${username}`);
+        return jsonResponse({ ok: true }, 200, env);
+    } catch (err) {
+        console.error('DeleteUser error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
+}
+
+// --- Change password (admin) ---
+async function handleChangePassword(request, env) {
+    try {
+        const sessionId = getSessionId(request);
+        if (!sessionId) {
+            return jsonResponse({ error: 'No session' }, 401, env);
+        }
+
+        const session = await env.AUTH_KV.get(`session:${sessionId}`, 'json');
+        if (!session || session.role !== 'root') {
+            return jsonResponse({ error: 'Forbidden' }, 403, env);
+        }
+
+        const url = new URL(request.url);
+        const username = decodeURIComponent(url.pathname.split('/').pop());
+        const { password } = await request.json();
+
+        if (!password) {
+            return jsonResponse({ error: 'Missing password' }, 400, env);
+        }
+
+        const user = await env.AUTH_KV.get(`user:${username}`, 'json');
+        if (!user) {
+            return jsonResponse({ error: 'User not found' }, 404, env);
+        }
+
+        user.password = password;
+        await env.AUTH_KV.put(`user:${username}`, JSON.stringify(user), { expirationTtl: 86400 * 365 });
+
+        return jsonResponse({ ok: true }, 200, env);
+    } catch (err) {
+        console.error('ChangePassword error:', err);
+        return jsonResponse({ error: err.message }, 500, env);
+    }
 }
 
 // ============================================================
