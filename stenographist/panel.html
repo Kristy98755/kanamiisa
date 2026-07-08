@@ -298,7 +298,7 @@
         // Check auth
         const isRoot = sessionStorage.getItem('is_root') === 'true';
         if (!isRoot) {
-            window.location.href = '/login';
+            window.location.href = '/stenographist/login';
         }
 
         // Tab switching
@@ -434,11 +434,11 @@
         // Logout
         document.getElementById('logout-btn').addEventListener('click', async () => {
             try {
-                await fetch('/login/api/logout', { method: 'POST' });
+                await fetch('/stenographist/login/api/logout', { method: 'POST' });
             } catch (err) {}
 
             sessionStorage.clear();
-            window.location.href = '/login';
+            window.location.href = '/stenographist/login';
         });
 
         // Helpers

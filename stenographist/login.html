@@ -154,7 +154,7 @@
             btn.textContent = 'Проверка...';
 
             try {
-                const res = await fetch('/login/api/auth', {
+                const res = await fetch('/stenographist/login/api/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
@@ -172,7 +172,7 @@
                 sessionStorage.setItem('is_root', data.is_root);
                 sessionStorage.setItem('username', username);
 
-                window.location.href = '/stenographist/';
+                window.location.href = '/stenographist/index.html';
             } catch (err) {
                 showError('Неправильный логин или пароль');
                 btn.disabled = false;

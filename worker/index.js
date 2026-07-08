@@ -20,82 +20,75 @@ export default {
             return new Response(null, { status: 204, headers: corsHeaders() });
         }
 
-        // === Public routes (no auth) ===
-
-        // Login page
-        if (path === '/login' || path === '/login/') {
-            return serveFile(env, 'login/index.html');
-        }
-
-        // TOTP setup page
-        if (path === '/login/setup' || path === '/login/setup/') {
-            return serveFile(env, 'login/setup.html');
-        }
-
-        // === Auth API ===
-
-        // Unified login (TOTP for root, password for guests)
-        if (path === '/login/api/auth' && request.method === 'POST') {
-            return handleAuth(request, env);
-        }
-
-        // Logout
-        if (path === '/login/api/logout' && request.method === 'POST') {
-            return handleLogout(request, env);
-        }
-
-        // Setup TOTP (cheat code protected)
-        if (path === '/login/api/setup' && request.method === 'POST') {
-            return handleSetup(request, env);
-        }
-
-        // Get current TOTP secret (for re-validation)
-        if (path === '/login/api/secret' && request.method === 'POST') {
-            return handleGetSecret(request, env);
-        }
-
-        // === Protected routes (auth required) ===
+        // === Stenographist routes ===
 
         if (path.startsWith('/stenographist/')) {
+            const subpath = path.slice('/stenographist/'.length);
+
+            // Login page (no auth)
+            if (subpath === 'login' || subpath === 'login/' || subpath === '') {
+                return serveFile(env, 'stenographist/login.html');
+            }
+
+            // Auth API (no auth)
+            if (subpath === 'login/api/auth' && request.method === 'POST') {
+                return handleAuth(request, env);
+            }
+            if (subpath === 'login/api/logout' && request.method === 'POST') {
+                return handleLogout(request, env);
+            }
+            if (subpath === 'login/api/setup' && request.method === 'POST') {
+                return handleSetup(request, env);
+            }
+            if (subpath === 'login/api/secret' && request.method === 'POST') {
+                return handleGetSecret(request, env);
+            }
+
+            // TOTP setup page (cheat code protected, no session)
+            if (subpath === 'setup' || subpath === 'setup/') {
+                return serveFile(env, 'stenographist/setup.html');
+            }
+
+            // Everything else requires auth
             const session = await validateSession(request, env);
 
             if (!session) {
-                return Response.redirect(new URL('/login', request.url), 302);
+                return Response.redirect(new URL('/stenographist/login', request.url), 302);
             }
 
             // Admin API
-            if (path === '/stenographist/api/users' && request.method === 'GET') {
+            if (subpath === 'api/users' && request.method === 'GET') {
                 if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
                 return handleListUsers(env);
             }
 
-            if (path === '/stenographist/api/users' && request.method === 'POST') {
+            if (subpath === 'api/users' && request.method === 'POST') {
                 if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
                 return handleCreateUser(request, env);
             }
 
-            if (path.match(/^\/stenographist\/api\/users\/[^/]+$/) && request.method === 'DELETE') {
+            if (subpath.match(/^api\/users\/[^/]+$/) && request.method === 'DELETE') {
                 if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
-                const username = path.split('/').pop();
+                const username = subpath.split('/').pop();
                 return handleDeleteUser(username, env);
             }
 
-            if (path === '/stenographist/api/logs' && request.method === 'GET') {
+            if (subpath === 'api/logs' && request.method === 'GET') {
                 if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
                 return handleListLogs(env);
             }
 
             // Stenographist API (audio processing)
-            if (path === '/stenographist/api/process' && request.method === 'POST') {
+            if (subpath === 'api/process' && request.method === 'POST') {
                 return handleProcess(request, env);
             }
 
             // Session info (for frontend)
-            if (path === '/stenographist/api/session' && request.method === 'GET') {
+            if (subpath === 'api/session' && request.method === 'GET') {
                 return jsonResponse({ username: session.username, is_root: session.is_root });
             }
 
-            // Static files
+            // Static files (CSS, JS, HTML)
             return serveFile(env, path.slice(1)); // Remove leading /
         }
 

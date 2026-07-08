@@ -162,11 +162,11 @@
 
                 <div style="margin-top: 24px;">
                     <div class="section-title">Готово</div>
-                    <a href="/login" class="btn btn-secondary" style="text-decoration: none; text-align: center; display: block;">Вернуться ко входу</a>
+                    <a href="/stenographist/login" class="btn btn-secondary" style="text-decoration: none; text-align: center; display: block;">Вернуться ко входу</a>
                 </div>
             </div>
 
-            <a href="/login" class="back-link">← Вернуться ко входу</a>
+            <a href="/stenographist/login" class="back-link">← Вернуться ко входу</a>
         </div>
     </div>
 
@@ -183,7 +183,7 @@
 
         async function verifyCheatCode(code) {
             try {
-                const res = await fetch('/login/api/setup', {
+                const res = await fetch('/stenographist/login/api/setup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ code })
@@ -204,7 +204,7 @@
             
             if (code === null) {
                 // User cancelled
-                window.location.href = '/login';
+                window.location.href = '/stenographist/login';
                 return;
             }
 
@@ -232,7 +232,7 @@
                 const code = prompt('Введите код доступа:');
                 if (!code) return;
 
-                const res = await fetch('/login/api/setup', {
+                const res = await fetch('/stenographist/login/api/setup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ code })
@@ -262,7 +262,7 @@
                 const code = prompt('Введите код доступа:');
                 if (!code) return;
 
-                const res = await fetch('/login/api/secret', {
+                const res = await fetch('/stenographist/login/api/secret', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ code })
