@@ -76,6 +76,12 @@ body {
     letter-spacing: -0.5px;
 }
 
+.header__right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .header__badge {
     font-size: 11px;
     font-weight: 600;
@@ -85,6 +91,21 @@ body {
     border-radius: var(--radius-sm);
     background: var(--color-warning);
     color: #1a1d27;
+}
+
+.header__admin-btn {
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary);
+    color: #fff;
+    transition: opacity 0.2s;
+}
+
+.header__admin-btn:hover {
+    opacity: 0.85;
 }
 
 /* Layout */

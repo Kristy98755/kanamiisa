@@ -75,6 +75,24 @@
             modeBadge.textContent = 'Production';
             modeBadge.style.background = 'var(--color-success)';
         }
+
+        checkAdminSession();
+    }
+
+    async function checkAdminSession() {
+        try {
+            const res = await fetch('/stenographist/api/session');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.is_root) {
+                const btn = document.createElement('a');
+                btn.href = '/stenographist/panel.html';
+                btn.className = 'header__admin-btn';
+                btn.textContent = 'Панель управления';
+                btn.title = 'Управление пользователями и логами';
+                document.querySelector('.header__right').appendChild(btn);
+            }
+        } catch {}
     }
 
     // --- Tabs ---
