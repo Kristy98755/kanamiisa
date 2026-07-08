@@ -87,6 +87,22 @@ body {
     color: #1a1d27;
 }
 
+.header__admin-btn {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary-dim);
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: background var(--transition), color var(--transition);
+}
+
+.header__admin-btn:hover {
+    background: var(--color-primary);
+    color: #fff;
+}
+
 /* Layout */
 .layout {
     display: flex;
