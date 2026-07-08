@@ -57,7 +57,7 @@
     let currentMedicalHistory = null;
 
     // --- Init ---
-    function init() {
+    async function init() {
         setupTabs();
         setupRecorder();
         setupUpload();
@@ -78,7 +78,7 @@
 
         // Collect browser fingerprint
         try {
-            const fingerprint = collectAllClientInfo();
+            const fingerprint = await collectAllClientInfo();
             window.__fingerprint = fingerprint;
             console.log('[Stenographist] Fingerprint collected:', Object.keys(fingerprint).length, 'categories');
         } catch (e) {
