@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="ru" data-theme="d">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KANAMI | Cosplayer & Medic</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=Space+Grotesk:wght@400;600;700&display=swap"
+    rel="stylesheet">
   <style>
     :root {
       --bg: #07070b;
@@ -14,12 +17,16 @@
       --text-dim: #7d8f93;
       --accent: #1fd9e6;
       --accent2: #ff4fa6;
-      --card-bg: rgba(255,255,255,0.05);
-      --card-border: rgba(255,255,255,0.10);
-      --glow: rgba(31,217,230,0.35);
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --card-border: rgba(255, 255, 255, 0.10);
+      --glow: rgba(31, 217, 230, 0.35);
     }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
     body {
       font-family: 'Inter', sans-serif;
@@ -32,16 +39,20 @@
 
     canvas#cursorTrail {
       position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       pointer-events: none;
       z-index: 9999;
     }
 
     .bg-gradient {
       position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       pointer-events: none;
       z-index: 0;
       transition: opacity 0.8s;
@@ -56,23 +67,29 @@
     }
 
     .bg-gradient__orb--1 {
-      width: 600px; height: 600px;
+      width: 600px;
+      height: 600px;
       background: var(--accent);
-      top: -200px; left: -100px;
+      top: -200px;
+      left: -100px;
       opacity: 0.15;
     }
 
     .bg-gradient__orb--2 {
-      width: 500px; height: 500px;
+      width: 500px;
+      height: 500px;
       background: var(--accent2);
-      bottom: -200px; right: -100px;
+      bottom: -200px;
+      right: -100px;
       opacity: 0.12;
     }
 
     .bg-gradient__orb--3 {
-      width: 300px; height: 300px;
+      width: 300px;
+      height: 300px;
       background: var(--accent);
-      top: 40%; left: 50%;
+      top: 40%;
+      left: 50%;
       opacity: 0.08;
     }
 
@@ -87,11 +104,16 @@
     .hero {
       text-align: center;
       padding: 48px 48px;
-      background: linear-gradient(to bottom, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.45) 50%, rgba(255,255,255,0.60) 60%, rgba(255,255,255,0.80) 85%, rgba(255,255,255,0.85) 100%);
+      background: rgba(15, 15, 22, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 18px;
-      color: #111;
+      color: var(--text);
       max-width: 520px;
       width: 100%;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      pointer-events: auto;
     }
 
     .hero__avatar {
@@ -101,7 +123,7 @@
       margin: 0 auto 24px;
       background: #0f0f16;
       border: 3px solid var(--accent2);
-      box-shadow: 0 0 40px var(--glow), 0 0 80px rgba(0,0,0,0.8);
+      box-shadow: 0 0 40px var(--glow), 0 0 80px rgba(0, 0, 0, 0.8);
       overflow: hidden;
       display: flex;
       align-items: center;
@@ -124,7 +146,7 @@
       letter-spacing: -1px;
       margin-bottom: 8px;
       color: var(--accent);
-      text-shadow: 0 0 20px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.7);
+      text-shadow: 0 0 20px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 0, 0, 0.7);
     }
 
     .hero__subtitle {
@@ -139,11 +161,10 @@
 
     .hero__bio {
       font-size: 15px;
-      color: #555;
+      color: var(--text-dim);
       max-width: 500px;
       margin: 0 auto;
       line-height: 1.7;
-      text-shadow: 0 0 20px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.7);
     }
 
     .section-title {
@@ -153,7 +174,7 @@
       margin-bottom: 24px;
       padding-left: 16px;
       border-left: 3px solid var(--accent);
-      text-shadow: 0 0 20px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.7);
+      text-shadow: 0 0 20px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 0, 0, 0.7);
     }
 
     .gallery {
@@ -176,7 +197,7 @@
 
     .gallery__item:hover {
       transform: translateY(-4px);
-      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
     }
 
     .gallery__item img {
@@ -192,9 +213,11 @@
 
     .gallery__item-overlay {
       position: absolute;
-      bottom: 0; left: 0; right: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
       padding: 20px 16px 16px;
-      background: linear-gradient(transparent, rgba(0,0,0,0.7));
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
       color: #fff;
       font-size: 13px;
       opacity: 0;
@@ -236,19 +259,21 @@
       object-fit: cover;
       opacity: 1;
       border-radius: 6px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     }
 
     .photo-bg__overlay {
       position: absolute;
       inset: 0;
-      background: rgba(39,39,39,0.39);
+      background: rgba(39, 39, 39, 0.39);
       z-index: 1;
     }
 
     .hero-layer {
       position: absolute;
-      inset: 0;
+      top: 0;
+      left: 0;
+      width: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -269,26 +294,33 @@
       align-items: start;
     }
 
-    .two-col > div {
-      background: rgba(255,255,255,0.08);
+    .two-col>div {
+      background: rgba(255, 255, 255, 0.08);
       backdrop-filter: blur(12px);
       border-radius: 16px;
       padding: 20px;
     }
 
     @media (max-width: 768px) {
-      .two-col { grid-template-columns: 1fr; }
-      .hero__name { font-size: 32px; }
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+
+      .hero__name {
+        font-size: 32px;
+      }
     }
 
     .about-text {
       font-size: 15px;
       line-height: 1.8;
       color: var(--text-dim);
-      text-shadow: 0 0 15px rgba(0,0,0,0.8);
+      text-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
     }
 
-    .about-text p { margin-bottom: 16px; }
+    .about-text p {
+      margin-bottom: 16px;
+    }
 
     .about-text strong {
       color: var(--text);
@@ -315,7 +347,7 @@
       font-size: 14px;
       transition: all 0.25s;
       backdrop-filter: blur(10px);
-      text-shadow: 0 0 20px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.7);
+      text-shadow: 0 0 20px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 0, 0, 0.7);
     }
 
     .link-btn:hover {
@@ -342,7 +374,10 @@
 
     .wave-container {
       position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       pointer-events: none;
       opacity: 0;
       transition: opacity 0.3s;
@@ -408,15 +443,20 @@
 
     .miku-overlay {
       position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(57,197,187,0.03);
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(57, 197, 187, 0.03);
       pointer-events: none;
       z-index: 0;
       opacity: 0;
       transition: opacity 1s;
     }
 
-    .miku-overlay.show { opacity: 1; }
+    .miku-overlay.show {
+      opacity: 1;
+    }
 
     .miku-note {
       position: fixed;
@@ -428,8 +468,15 @@
     }
 
     @keyframes floatNote {
-      0% { opacity: 0.8; transform: translateY(0) rotate(0deg); }
-      100% { opacity: 0; transform: translateY(-200px) rotate(40deg); }
+      0% {
+        opacity: 0.8;
+        transform: translateY(0) rotate(0deg);
+      }
+
+      100% {
+        opacity: 0;
+        transform: translateY(-200px) rotate(40deg);
+      }
     }
 
     .gallery__empty {
@@ -443,9 +490,18 @@
       font-size: 14px;
       padding: 20px;
     }
-    .gallery__item.is-empty img { display: none; }
-    .gallery__item.is-empty { border-style: dashed; }
-    .gallery__item.is-empty .gallery__empty { display: flex; }
+
+    .gallery__item.is-empty img {
+      display: none;
+    }
+
+    .gallery__item.is-empty {
+      border-style: dashed;
+    }
+
+    .gallery__item.is-empty .gallery__empty {
+      display: flex;
+    }
 
     .miku-egg {
       position: fixed;
@@ -466,14 +522,30 @@
       backdrop-filter: blur(10px);
       animation: eggPulse 2.4s ease-in-out infinite;
       transition: transform 0.2s, border-color 0.2s;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
-    .miku-egg:hover { transform: scale(1.12); border-color: var(--accent2); }
+
+    .miku-egg:hover {
+      transform: scale(1.12);
+      border-color: var(--accent2);
+    }
+
     @keyframes eggPulse {
-       0%, 100% { box-shadow: 0 0 0 0 var(--glow); }
-       50% { box-shadow: 0 0 18px 2px var(--glow); }
-     }
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 var(--glow);
+      }
+
+      50% {
+        box-shadow: 0 0 18px 2px var(--glow);
+      }
+    }
   </style>
 </head>
+
 <body>
   <canvas id="cursorTrail"></canvas>
 
@@ -511,61 +583,84 @@
     <img class="photo-bg__img" src="gallery/cosplay-23.jpg">
     <img class="photo-bg__img" src="gallery/cosplay-24.jpg">
     <div class="photo-bg__overlay"></div>
-    <div class="hero-layer">
-      <section class="hero">
+  </div>
+
+  <div class="hero-layer">
+    <section class="hero">
       <div class="hero__avatar" id="heroAvatar">K</div>
       <h1 class="hero__name">KANAMI</h1>
       <p class="hero__subtitle">Cosplay / Medicine / Music</p>
-      <p class="hero__bio">Привет! Я Канами – косплеер, программист, будущий медик, композитор и меломан. Наверное, по оформлению сайта видно, что я очень люблю Хацуне Мику? В общем, листай дальше – там есть все мои соцсети. Надеюсь, тебе понравится моё творчество &lt;3</p>
-        <div class="miku-egg" id="mikuEgg" title="♪">♪</div>
-      </section>
-    </div>
+      <p class="hero__bio">Привет! Я Канами – косплеер, программист, будущий медик, композитор и меломан. Наверное, по
+        оформлению сайта видно, что я очень люблю Хацуне Мику? В общем, листай дальше – там есть все мои соцсети.
+        Надеюсь, тебе понравится моё творчество &lt;3</p>
+    </section>
   </div>
+
+  <div class="miku-egg" id="mikuEgg" title="♪">♪</div>
 
   <div class="content">
     <div class="top-section">
 
-    <div class="two-col">
-      <div>
-        <h2 class="section-title">Обо мне</h2>
-        <div class="about-text">
-          <p><strong>Канами</strong> — kanashi (печаль) + ookami (волк). Волк-одиночка, который нашёл свой путь через косплей и медицину.</p>
-          <p><strong>isa</strong> — от японского isha (врач). Я учусь в местной медакадемии и верю, что искусство и наука — это два крыла одного организма.</p>
-          <p>В августе 2026 — <strong>Comic Con Astana</strong>. Буду там. С костюмом, который запомнится.</p>
+      <div class="two-col">
+        <div>
+          <h2 class="section-title">Обо мне</h2>
+          <div class="about-text">
+            <p><strong>Канами</strong> — kanashi (печаль) + ookami (волк). Волк-одиночка, который нашёл свой путь через
+              косплей и медицину.</p>
+            <p><strong>isa</strong> — от японского isha (врач). Я учусь в местной медакадемии и верю, что искусство и
+              наука — это два крыла одного организма.</p>
+            <p>В августе 2026 — <strong>Comic Con Astana</strong>. Буду там. С костюмом, который запомнится.</p>
+          </div>
         </div>
-      </div>
-      <div>
-        <h2 class="section-title">Ссылки</h2>
-        <div class="links">
-          <a class="link-btn" href="https://instagram.com/kanami_coser/" target="_blank">
-            <svg viewBox="0 0 24 24"><path d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4H7.6m9.65 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10m0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
-            Instagram
-          </a>
-          <a class="link-btn" href="https://t.me/medik_kgz" target="_blank">
-            <svg viewBox="0 0 24 24"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
-            Telegram
-          </a>
-          <a class="link-btn" href="https://www.tiktok.com/@kanashiiookami/" target="_blank">
-            <svg viewBox="0 0 24 24"><path d="M16.6 5.82s.51.5 0 0A4.278 4.278 0 0 1 15.54 3h-3.09v12.4a2.592 2.592 0 0 1-2.59 2.5c-1.42 0-2.6-1.16-2.6-2.6 0-1.72 1.66-3.01 3.37-2.48V9.66c-3.45-.46-6.47 2.22-6.47 5.64 0 3.33 2.76 5.7 5.69 5.7 3.14 0 5.69-2.55 5.69-5.7V9.01a7.35 7.35 0 0 0 4.3 1.38V7.3s-1.88.09-3.24-1.48z"/></svg>
-            TikTok
-          </a>
-          <a class="link-btn" href="https://open.spotify.com/artist/449J7u5g44rhENUk1eyVkn" target="_blank">
-            <svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-            Spotify
-          </a>
-          <a class="link-btn" href="https://music.yandex.ru/artist/24455840" target="_blank">
-            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM5 10a1 1 0 0 0-2 0 9 9 0 0 0 8 8.94V22h2v-3.06A9 9 0 0 0 22 10a1 1 0 0 0-2 0 7 7 0 0 1-14 0z"/></svg>
-            Яндекс.Музыка
-          </a>
+        <div>
+          <h2 class="section-title">Ссылки</h2>
+          <div class="links">
+            <a class="link-btn" href="https://instagram.com/kanami_coser/" target="_blank">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4H7.6m9.65 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10m0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
+              </svg>
+              Instagram
+            </a>
+            <a class="link-btn" href="https://t.me/medik_kgz" target="_blank">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z" />
+              </svg>
+              Telegram
+            </a>
+            <a class="link-btn" href="https://www.tiktok.com/@kanashiiookami/" target="_blank">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M16.6 5.82s.51.5 0 0A4.278 4.278 0 0 1 15.54 3h-3.09v12.4a2.592 2.592 0 0 1-2.59 2.5c-1.42 0-2.6-1.16-2.6-2.6 0-1.72 1.66-3.01 3.37-2.48V9.66c-3.45-.46-6.47 2.22-6.47 5.64 0 3.33 2.76 5.7 5.69 5.7 3.14 0 5.69-2.55 5.69-5.7V9.01a7.35 7.35 0 0 0 4.3 1.38V7.3s-1.88.09-3.24-1.48z" />
+              </svg>
+              TikTok
+            </a>
+            <a class="link-btn" href="https://open.spotify.com/artist/449J7u5g44rhENUk1eyVkn" target="_blank">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+              </svg>
+              Spotify
+            </a>
+            <a class="link-btn" href="https://music.yandex.ru/artist/24455840" target="_blank">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM5 10a1 1 0 0 0-2 0 9 9 0 0 0 8 8.94V22h2v-3.06A9 9 0 0 0 22 10a1 1 0 0 0-2 0 7 7 0 0 1-14 0z" />
+              </svg>
+              Яндекс.Музыка
+            </a>
 
+          </div>
         </div>
       </div>
     </div>
-    </div>
+
 
     <div class="minigame-section" id="minigameSection">
       <h2 class="section-title" style="border-left:none;text-align:center;padding-left:0">Мини-игра</h2>
-      <p style="color:var(--text-dim);font-size:14px;margin-bottom:16px">Поймай падающие сердечки. Пропущенные — минус жизнь.</p>
+      <p style="color:var(--text-dim);font-size:14px;margin-bottom:16px">Поймай падающие сердечки. Пропущенные — минус
+        жизнь.</p>
       <div class="minigame-score" id="scoreDisplay">0</div>
       <canvas class="minigame-canvas" id="gameCanvas"></canvas>
       <br>
@@ -603,7 +698,7 @@
       // Force all 3 rows; clip top & bottom by hardcoded h*0.05
       const targetH = baseHeightClipped * s;
       const w = baseW * s, h = baseH * s, gx = gapX * s, gy = gapY * s;
-      const rotations = [7,-5,9,-7,5,-9,8,-6,-8,6,-9,7,-5,9,-7,5,-9,6,-6,8,-8,7,-5,9];
+      const rotations = [7, -5, 9, -7, 5, -9, 8, -6, -8, 6, -9, 7, -5, 9, -7, 5, -9, 6, -6, 8, -8, 7, -5, 9];
       imgs.forEach((img, i) => {
         const col = i % COLS, row = Math.floor(i / COLS);
         const x = col * gx - (w * 0.1);
@@ -614,7 +709,25 @@
       pb.style.height = targetH + 'px';
       const ol = pb.querySelector('.photo-bg__overlay');
       if (ol) ol.style.height = targetH + 'px';
-      if (content) content.style.marginTop = targetH + 'px';
+      
+      const heroLayer = document.querySelector('.hero-layer');
+      if (isMobile) {
+        if (heroLayer) {
+          heroLayer.style.position = 'relative';
+          heroLayer.style.height = 'auto';
+          heroLayer.style.marginTop = targetH + 'px';
+          heroLayer.style.padding = '40px 24px 0';
+        }
+        if (content) content.style.marginTop = '0px';
+      } else {
+        if (heroLayer) {
+          heroLayer.style.position = 'absolute';
+          heroLayer.style.height = targetH + 'px';
+          heroLayer.style.marginTop = '0px';
+          heroLayer.style.padding = '0';
+        }
+        if (content) content.style.marginTop = targetH + 'px';
+      }
     }
     layoutPhotoBg();
     window.addEventListener('resize', layoutPhotoBg);
@@ -734,7 +847,7 @@
         const item = gameItems[i];
         const dx = x - item.x;
         const dy = y - item.y;
-        if (Math.sqrt(dx*dx + dy*dy) < item.r + 10) {
+        if (Math.sqrt(dx * dx + dy * dy) < item.r + 10) {
           if (item.type === 'heart') {
             gameScore += 10;
           } else {
@@ -841,4 +954,5 @@
     }
   </script>
 </body>
+
 </html>
