@@ -8,51 +8,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0a0a0f;
-      --bg2: #111118;
-      --text: #e8e6e3;
-      --text-dim: #6b6b7b;
-      --accent: #7c5cff;
-      --accent2: #ff6b9d;
-      --card-bg: rgba(255,255,255,0.04);
-      --card-border: rgba(255,255,255,0.08);
-      --glow: rgba(124,92,255,0.3);
-    }
-
-    [data-theme="n"] {
-      --bg: #f5f3f0;
-      --bg2: #eae7e2;
-      --text: #1a1a2e;
-      --text-dim: #8888a0;
-      --accent: #5b3cc4;
-      --accent2: #e05588;
-      --card-bg: rgba(0,0,0,0.03);
-      --card-border: rgba(0,0,0,0.08);
-      --glow: rgba(91,60,196,0.2);
-    }
-
-    [data-theme="dmiku"] {
-      --bg: #0a0f14;
-      --bg2: #0d1520;
-      --text: #e0f0ff;
-      --text-dim: #4a7a9a;
-      --accent: #39c5bb;
-      --accent2: #ff4da6;
-      --card-bg: rgba(57,197,187,0.05);
-      --card-border: rgba(57,197,187,0.12);
-      --glow: rgba(57,197,187,0.3);
-    }
-
-    [data-theme="nmiku"] {
-      --bg: #f0f7f6;
-      --bg2: #e4f0ee;
-      --text: #0a2a28;
-      --text-dim: #5a9a96;
-      --accent: #2da89e;
-      --accent2: #d94daa;
-      --card-bg: rgba(45,168,158,0.06);
-      --card-border: rgba(45,168,158,0.12);
-      --glow: rgba(45,168,158,0.25);
+      --bg: #07070b;
+      --bg2: #0f0f16;
+      --text: #f3f8f9;
+      --text-dim: #7d8f93;
+      --accent: #1fd9e6;
+      --accent2: #ff4fa6;
+      --card-bg: rgba(255,255,255,0.05);
+      --card-border: rgba(255,255,255,0.10);
+      --glow: rgba(31,217,230,0.35);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -122,7 +86,12 @@
 
     .hero {
       text-align: center;
-      padding: 60px 0 40px;
+      padding: 48px 48px;
+      background: linear-gradient(to bottom, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.45) 50%, rgba(255,255,255,0.60) 60%, rgba(255,255,255,0.80) 85%, rgba(255,255,255,0.85) 100%);
+      border-radius: 18px;
+      color: #111;
+      max-width: 520px;
+      width: 100%;
     }
 
     .hero__avatar {
@@ -130,9 +99,9 @@
       height: 120px;
       border-radius: 50%;
       margin: 0 auto 24px;
-      background: var(--bg2);
-      border: 3px solid var(--accent);
-      box-shadow: 0 0 40px var(--glow);
+      background: #0f0f16;
+      border: 3px solid var(--accent2);
+      box-shadow: 0 0 40px var(--glow), 0 0 80px rgba(0,0,0,0.8);
       overflow: hidden;
       display: flex;
       align-items: center;
@@ -154,16 +123,15 @@
       font-weight: 700;
       letter-spacing: -1px;
       margin-bottom: 8px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: var(--accent);
+      text-shadow: 0 0 20px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.7);
     }
 
     .hero__subtitle {
       font-size: 15px;
-      color: var(--text-dim);
-      font-weight: 300;
+      color: var(--accent2);
+      text-shadow: 0 0 28px rgba(90, 190, 190, 0.7), 0 0 25px rgba(10, 10, 10, 0.5);
+      font-weight: 500;
       letter-spacing: 2px;
       text-transform: uppercase;
       margin-bottom: 16px;
@@ -171,10 +139,11 @@
 
     .hero__bio {
       font-size: 15px;
-      color: var(--text-dim);
+      color: #555;
       max-width: 500px;
       margin: 0 auto;
       line-height: 1.7;
+      text-shadow: 0 0 20px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.7);
     }
 
     .section-title {
@@ -184,6 +153,7 @@
       margin-bottom: 24px;
       padding-left: 16px;
       border-left: 3px solid var(--accent);
+      text-shadow: 0 0 20px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.7);
     }
 
     .gallery {
@@ -247,12 +217,63 @@
       padding: 20px;
     }
 
+    .top-section {
+      position: relative;
+    }
+
+    .photo-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .photo-bg__img {
+      position: absolute;
+      object-fit: cover;
+      opacity: 1;
+      border-radius: 6px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    .photo-bg__overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(39,39,39,0.39);
+      z-index: 1;
+    }
+
+    .hero-layer {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .hero-layer .hero {
+      width: 100%;
+      pointer-events: auto;
+    }
+
     .two-col {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 40px;
       margin-bottom: 60px;
       align-items: start;
+    }
+
+    .two-col > div {
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 20px;
     }
 
     @media (max-width: 768px) {
@@ -264,6 +285,7 @@
       font-size: 15px;
       line-height: 1.8;
       color: var(--text-dim);
+      text-shadow: 0 0 15px rgba(0,0,0,0.8);
     }
 
     .about-text p { margin-bottom: 16px; }
@@ -293,6 +315,7 @@
       font-size: 14px;
       transition: all 0.25s;
       backdrop-filter: blur(10px);
+      text-shadow: 0 0 20px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.7);
     }
 
     .link-btn:hover {
@@ -316,39 +339,6 @@
       font-size: 12px;
       letter-spacing: 1px;
     }
-
-    .theme-switch {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 100;
-      display: flex;
-      gap: 6px;
-    }
-
-    .theme-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: 2px solid var(--card-border);
-      cursor: pointer;
-      transition: all 0.2s;
-      position: relative;
-    }
-
-    .theme-btn:hover {
-      transform: scale(1.15);
-    }
-
-    .theme-btn.active {
-      border-color: var(--accent);
-      box-shadow: 0 0 12px var(--glow);
-    }
-
-    .theme-btn--d { background: #0a0a0f; }
-    .theme-btn--n { background: #f5f3f0; }
-    .theme-btn--dmiku { background: #0a1420; }
-    .theme-btn--nmiku { background: #e4f0ee; }
 
     .wave-container {
       position: absolute;
@@ -426,7 +416,7 @@
       transition: opacity 1s;
     }
 
-    [data-theme^="miku"] .miku-overlay { opacity: 1; }
+    .miku-overlay.show { opacity: 1; }
 
     .miku-note {
       position: fixed;
@@ -442,30 +432,46 @@
       100% { opacity: 0; transform: translateY(-200px) rotate(40deg); }
     }
 
-    .qr-section {
-      text-align: center;
-      margin-bottom: 40px;
-    }
-
-    .qr-section canvas {
-      border-radius: 12px;
-      background: #fff;
-      padding: 12px;
-      margin-bottom: 12px;
-    }
-
-    .qr-label {
-      font-size: 12px;
-      color: var(--text-dim);
-    }
-
-    .hidden-miku-trigger {
+    .gallery__empty {
       position: absolute;
-      width: 4px;
-      height: 4px;
-      opacity: 0;
-      cursor: default;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 14px;
+      padding: 20px;
     }
+    .gallery__item.is-empty img { display: none; }
+    .gallery__item.is-empty { border-style: dashed; }
+    .gallery__item.is-empty .gallery__empty { display: flex; }
+
+    .miku-egg {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      z-index: 100;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 2px solid var(--card-border);
+      background: var(--card-bg);
+      color: var(--accent2);
+      font-size: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(10px);
+      animation: eggPulse 2.4s ease-in-out infinite;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .miku-egg:hover { transform: scale(1.12); border-color: var(--accent2); }
+    @keyframes eggPulse {
+       0%, 100% { box-shadow: 0 0 0 0 var(--glow); }
+       50% { box-shadow: 0 0 18px 2px var(--glow); }
+     }
   </style>
 </head>
 <body>
@@ -479,23 +485,45 @@
 
   <div class="miku-overlay"></div>
 
-  <div class="theme-switch">
-    <button class="theme-btn theme-btn--d active" data-theme="d" title="Dark"></button>
-    <button class="theme-btn theme-btn--n" data-theme="n" title="Light"></button>
-    <button class="theme-btn theme-btn--dmiku" data-theme="dmiku" title="Dark Miku"></button>
-    <button class="theme-btn theme-btn--nmiku" data-theme="nmiku" title="Light Miku"></button>
+  <div class="photo-bg" id="photoBg">
+    <img class="photo-bg__img" src="gallery/cosplay-1.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-2.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-3.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-4.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-5.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-6.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-7.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-8.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-9.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-10.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-11.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-12.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-13.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-14.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-15.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-16.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-17.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-18.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-19.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-20.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-21.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-22.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-23.jpg">
+    <img class="photo-bg__img" src="gallery/cosplay-24.jpg">
+    <div class="photo-bg__overlay"></div>
+    <div class="hero-layer">
+      <section class="hero">
+      <div class="hero__avatar" id="heroAvatar">K</div>
+      <h1 class="hero__name">KANAMI</h1>
+      <p class="hero__subtitle">Cosplay / Medicine / Music</p>
+      <p class="hero__bio">Привет! Я Канами – косплеер, программист, будущий медик, композитор и меломан. Наверное, по оформлению сайта видно, что я очень люблю Хацуне Мику? В общем, листай дальше – там есть все мои соцсети. Надеюсь, тебе понравится моё творчество &lt;3</p>
+        <div class="miku-egg" id="mikuEgg" title="♪">♪</div>
+      </section>
+    </div>
   </div>
 
   <div class="content">
-    <section class="hero">
-      <div class="hero__avatar" id="heroAvatar">K</div>
-      <h1 class="hero__name">KANAMI</h1>
-      <p class="hero__subtitle">Cosplayer / Medic / Musician</p>
-      <p class="hero__bio">Привет! Я Канами — косплеер, будущий медик и меломан. Создаю костюмы, которые заставляют людей останавливаться и смотреть.</p>
-      <div style="position:relative">
-        <div class="hidden-miku-trigger" id="mikuTrigger"></div>
-      </div>
-    </section>
+    <div class="top-section">
 
     <div class="two-col">
       <div>
@@ -529,28 +557,10 @@
             <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM5 10a1 1 0 0 0-2 0 9 9 0 0 0 8 8.94V22h2v-3.06A9 9 0 0 0 22 10a1 1 0 0 0-2 0 7 7 0 0 1-14 0z"/></svg>
             Яндекс.Музыка
           </a>
-          <a class="link-btn" href="https://github.com/kristy98755" target="_blank">
-            <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
-            GitHub
-          </a>
+
         </div>
       </div>
     </div>
-
-    <h2 class="section-title">Косплеи</h2>
-    <div class="gallery" id="gallery">
-      <div class="gallery__item">
-        <div class="gallery__placeholder">Фото 1<br><small>замени на своё</small></div>
-        <div class="wave-container"><svg class="wave-line" viewBox="0 0 600 60" preserveAspectRatio="none"><path d="M0,30 Q150,10 300,30 T600,30 L600,60 L0,60Z" fill="var(--accent)" opacity="0.3"/></svg></div>
-      </div>
-      <div class="gallery__item">
-        <div class="gallery__placeholder">Фото 2<br><small>замени на своё</small></div>
-        <div class="wave-container"><svg class="wave-line" viewBox="0 0 600 60" preserveAspectRatio="none"><path d="M0,30 Q150,10 300,30 T600,30 L600,60 L0,60Z" fill="var(--accent)" opacity="0.3"/></svg></div>
-      </div>
-      <div class="gallery__item">
-        <div class="gallery__placeholder">Фото 3<br><small>замени на своё</small></div>
-        <div class="wave-container"><svg class="wave-line" viewBox="0 0 600 60" preserveAspectRatio="none"><path d="M0,30 Q150,10 300,30 T600,30 L600,60 L0,60Z" fill="var(--accent)" opacity="0.3"/></svg></div>
-      </div>
     </div>
 
     <div class="minigame-section" id="minigameSection">
@@ -562,39 +572,52 @@
       <button class="minigame-btn" id="gameBtn" onclick="startGame()">Играть</button>
     </div>
 
-    <div class="qr-section">
-      <h2 class="section-title" style="border-left:none;text-align:center;padding-left:0">Визитка</h2>
-      <canvas id="qrCanvas" width="200" height="200"></canvas>
-      <p class="qr-label">Сканируй → kanamiisa.uk</p>
-    </div>
-
     <div class="footer">
       KANAMI &copy; 2026
     </div>
   </div>
 
+  <script src="qrcode.js"></script>
   <script>
-    // ===== THEME SYSTEM =====
-    const params = new URLSearchParams(window.location.search);
-    let currentTheme = params.get('t') || 'd';
-    if (!['d','n','dmiku','nmiku'].includes(currentTheme)) currentTheme = 'd';
+    // ===== BASE THEME =====
+    document.documentElement.setAttribute('data-theme', 'd');
 
-    function setTheme(t) {
-      currentTheme = t;
-      document.documentElement.setAttribute('data-theme', t);
-      document.querySelectorAll('.theme-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.theme === t);
+    // ===== PHOTO BG DYNAMIC LAYOUT =====
+    function layoutPhotoBg() {
+      const pb = document.getElementById('photoBg');
+      const hero = document.querySelector('.hero');
+      const content = document.querySelector('.content');
+      if (!pb || !hero) return;
+      const vw = window.innerWidth;
+      const imgs = pb.querySelectorAll('.photo-bg__img');
+      const isMobile = vw < 768;
+      const COLS = isMobile ? 6 : 8, ROWS = isMobile ? 4 : 3;
+      const baseW = vw * 0.055;
+      const baseH = baseW * 1.3;
+      const gapX = baseW * 0.88;
+      const gapY = baseH * 0.93;
+      const baseHeight = (ROWS - 1) * gapY + baseH;
+      const baseHeightClipped = (ROWS - 1) * gapY + baseH * 0.9;
+      // Make grid wider than viewport so it bleeds w*0.1 on BOTH left & right edges (then shifted left by w*0.1)
+      let s = Math.max(vw / ((COLS - 1) * gapX + baseW * 0.8), 1.0);
+      // Force all 3 rows; clip top & bottom by hardcoded h*0.05
+      const targetH = baseHeightClipped * s;
+      const w = baseW * s, h = baseH * s, gx = gapX * s, gy = gapY * s;
+      const rotations = [7,-5,9,-7,5,-9,8,-6,-8,6,-9,7,-5,9,-7,5,-9,6,-6,8,-8,7,-5,9];
+      imgs.forEach((img, i) => {
+        const col = i % COLS, row = Math.floor(i / COLS);
+        const x = col * gx - (w * 0.1);
+        const y = row * gy - (h * 0.05);
+        const r = rotations[i % rotations.length];
+        img.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;transform:rotate(${r}deg);object-fit:cover;opacity:1;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,0.4);`;
       });
-      const url = new URL(window.location);
-      url.searchParams.set('t', t);
-      history.replaceState(null, '', url);
+      pb.style.height = targetH + 'px';
+      const ol = pb.querySelector('.photo-bg__overlay');
+      if (ol) ol.style.height = targetH + 'px';
+      if (content) content.style.marginTop = targetH + 'px';
     }
-
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-      btn.addEventListener('click', () => setTheme(btn.dataset.theme));
-    });
-
-    setTheme(currentTheme);
+    layoutPhotoBg();
+    window.addEventListener('resize', layoutPhotoBg);
 
     // ===== CURSOR PARTICLE TRAIL =====
     const trailCanvas = document.getElementById('cursorTrail');
@@ -790,79 +813,32 @@
       gameCtx.fillText(`Игра окончена! Счёт: ${gameScore}`, gameCanvas.width / 2, gameCanvas.height / 2);
     }
 
-    // ===== MIKU EASTER EGG =====
+    // ===== MIKU EASTER EGG (visible ♪ button, bottom-left) =====
     let mikuClicks = 0;
     let mikuTimer;
-    document.getElementById('mikuTrigger').addEventListener('click', () => {
-      mikuClicks++;
-      clearTimeout(mikuTimer);
-      mikuTimer = setTimeout(() => { mikuClicks = 0; }, 1500);
-      if (mikuClicks >= 5) {
-        mikuClicks = 0;
-        const themes = ['d', 'n', 'dmiku', 'nmiku'];
-        const idx = themes.indexOf(currentTheme);
-        const next = themes[(idx + 1) % themes.length];
-        setTheme(next);
+    const mikuEgg = document.getElementById('mikuEgg');
+    if (mikuEgg) {
+      mikuEgg.addEventListener('click', () => {
+        mikuClicks++;
+        clearTimeout(mikuTimer);
+        mikuTimer = setTimeout(() => { mikuClicks = 0; }, 2500);
+        if (mikuClicks >= 5) {
+          mikuClicks = 0;
+          document.querySelector('.miku-overlay')?.classList.add('show');
 
-        for (let i = 0; i < 8; i++) {
-          const note = document.createElement('div');
-          note.className = 'miku-note';
-          note.textContent = '♪';
-          note.style.left = Math.random() * 100 + 'vw';
-          note.style.top = Math.random() * 60 + 20 + 'vh';
-          note.style.animationDelay = Math.random() * 0.5 + 's';
-          document.body.appendChild(note);
-          setTimeout(() => note.remove(), 3500);
-        }
-      }
-    });
-
-    // ===== SIMPLE QR (decorative) =====
-    function drawQR() {
-      const canvas = document.getElementById('qrCanvas');
-      const ctx = canvas.getContext('2d');
-      const size = 200;
-      const cellSize = 5;
-      const modules = Math.floor(size / cellSize);
-
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, size, size);
-
-      ctx.fillStyle = '#000000';
-
-      function drawFinderPattern(x, y) {
-        for (let i = 0; i < 7; i++) {
-          for (let j = 0; j < 7; j++) {
-            if (i === 0 || i === 6 || j === 0 || j === 6 ||
-                (i >= 2 && i <= 4 && j >= 2 && j <= 4)) {
-              ctx.fillRect((x + i) * cellSize, (y + j) * cellSize, cellSize, cellSize);
-            }
+          for (let i = 0; i < 8; i++) {
+            const note = document.createElement('div');
+            note.className = 'miku-note';
+            note.textContent = '♪';
+            note.style.left = Math.random() * 100 + 'vw';
+            note.style.top = Math.random() * 60 + 20 + 'vh';
+            note.style.animationDelay = Math.random() * 0.5 + 's';
+            document.body.appendChild(note);
+            setTimeout(() => note.remove(), 3500);
           }
         }
-      }
-
-      drawFinderPattern(1, 1);
-      drawFinderPattern(modules - 8, 1);
-      drawFinderPattern(1, modules - 8);
-
-      for (let i = 8; i < modules - 8; i++) {
-        for (let j = 8; j < modules - 8; j++) {
-          if ((i + j) % 3 === 0 && Math.random() > 0.4) {
-            ctx.fillRect(i * cellSize, j * cellSize, cellSize, cellSize);
-          }
-        }
-      }
-
-      for (let i = 0; i < modules; i++) {
-        if (Math.random() > 0.7) {
-          ctx.fillRect(i * cellSize, 7 * cellSize, cellSize, cellSize);
-        }
-        if (Math.random() > 0.7) {
-          ctx.fillRect(7 * cellSize, i * cellSize, cellSize, cellSize);
-        }
-      }
+      });
     }
-    drawQR();
   </script>
 </body>
 </html>
