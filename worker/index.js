@@ -478,17 +478,13 @@ async function handleAuth(request, env) {
         const deviceInfo = { ...serverInfo, ...(clientInfo || {}) };
         await saveLog(env, username, ip, ua, deviceInfo, Date.now());
 
-        const cookies = [
-            `session=${sessionId}; Path=/; HttpOnly; SameSite=Strict`,
-            `session_id=${stenoSessionId}; Path=/stenographist; SameSite=Strict; Max-Age=3600`
-        ];
+        const headers = new Headers({ 'Content-Type': 'application/json' });
+        headers.append('Set-Cookie', `session=${sessionId}; Path=/; HttpOnly; SameSite=Strict`);
+        headers.append('Set-Cookie', `session_id=${stenoSessionId}; Path=/stenographist; SameSite=Strict; Max-Age=3600`);
 
         return new Response(JSON.stringify({ success: true, is_root: isRoot }), {
             status: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Set-Cookie': cookies.join(', ')
-            }
+            headers
         });
     } catch (err) {
         return jsonResponse({ error: 'Неправильный логин или пароль' }, 401);
