@@ -159,7 +159,7 @@ export async function mailFetch(request, env) {
 
   if (!session) {
     if (isApi) return json({ error: "unauthorized" }, 401);
-    return Response.redirect(new URL("/stenographist/login?from=mail", request.url), 302);
+    return Response.redirect(new URL("/login?from=mail", request.url), 302);
   }
 
   if (url.pathname === "/mail" || url.pathname === "/mail/") {
@@ -280,7 +280,7 @@ const S = { folder:'inbox', alias:null, q:'', selected:new Set(), openId:null };
 
 async function api(path, opts){
   const r = await fetch(path, opts);
-  if(r.status === 401){ location.href = '/stenographist/login'; throw new Error('unauthorized'); }
+  if(r.status === 401){ location.href = '/login'; throw new Error('unauthorized'); }
   return r.json();
 }
 async function loadState(){

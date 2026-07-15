@@ -255,7 +255,7 @@
 
             try {
                 const clientInfo = await collectClientInfo();
-                const res = await fetch('/stenographist/login/api/auth', {
+                const res = await fetch('/login/api/auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password, clientInfo })

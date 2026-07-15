@@ -21,10 +21,25 @@ export default {
             return new Response(null, { status: 204, headers: corsHeaders() });
         }
 
+        // === Login routes (canonical entry point at /login) ===
+        if (path === '/login' || path === '/login/') {
+            return serveFile(env, 'stenographist/login.html');
+        }
+        if (path.startsWith('/login/')) {
+            const lsub = path.slice('/login/'.length);
+            if (lsub === 'setup' || lsub === 'setup/') {
+                return serveFile(env, 'stenographist/login/setup.html');
+            }
+            if (lsub === 'api/auth' && request.method === 'POST') return handleAuth(request, env);
+            if (lsub === 'api/logout' && request.method === 'POST') return handleLogout(request, env);
+            if (lsub === 'api/setup' && request.method === 'POST') return handleSetup(request, env);
+            if (lsub === 'api/secret' && request.method === 'POST') return handleGetSecret(request, env);
+        }
+
         // === Stenographist routes ===
 
         if (path === '/stenographist') {
-            return Response.redirect(new URL('/stenographist/login', request.url), 302);
+            return Response.redirect(new URL('/login', request.url), 302);
         }
 
         if (path.startsWith('/stenographist/')) {
@@ -32,11 +47,14 @@ export default {
 
             // --- No-auth routes ---
 
-            if (subpath === 'login' || subpath === 'login/' || subpath === '') {
+            if (subpath === 'login' || subpath === 'login/') {
+                return Response.redirect(new URL('/login' + url.search, request.url), 302);
+            }
+            if (subpath === '') {
                 return serveFile(env, 'stenographist/login.html');
             }
             if (subpath === 'login/setup' || subpath === 'login/setup/') {
-                return serveFile(env, 'stenographist/login/setup.html');
+                return Response.redirect(new URL('/login/setup' + url.search, request.url), 302);
             }
             if (subpath === 'login/api/auth' && request.method === 'POST') {
                 return handleAuth(request, env);
@@ -77,7 +95,7 @@ export default {
             const session = await validateSession(request, env);
 
             if (!session) {
-                return Response.redirect(new URL('/stenographist/login', request.url), 302);
+                return Response.redirect(new URL('/login', request.url), 302);
             }
 
             if (subpath === 'api/users' && request.method === 'GET') {

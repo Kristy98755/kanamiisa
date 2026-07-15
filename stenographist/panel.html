@@ -356,17 +356,17 @@
             try {
                 const res = await fetch('/stenographist/api/session');
                 if (!res.ok) {
-                    window.location.href = '/stenographist/login';
+                    window.location.href = '/login';
                     return false;
                 }
                 const data = await res.json();
                 if (!data.valid || data.role !== 'root') {
-                    window.location.href = '/stenographist/login';
+                    window.location.href = '/login';
                     return false;
                 }
                 return true;
             } catch {
-                window.location.href = '/stenographist/login';
+                window.location.href = '/login';
                 return false;
             }
         }
@@ -637,11 +637,11 @@
         // Logout
         document.getElementById('logout-btn').addEventListener('click', async () => {
             try {
-                await fetch('/stenographist/login/api/logout', { method: 'POST' });
+                await fetch('/login/api/logout', { method: 'POST' });
             } catch (err) {}
 
             sessionStorage.clear();
-            window.location.href = '/stenographist/login';
+            window.location.href = '/login';
         });
 
         // Helpers

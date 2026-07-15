@@ -114,10 +114,10 @@
 
     document.getElementById('btnLogout').addEventListener('click', async () => {
         try {
-            await fetch('/stenographist/login/api/logout', { method: 'POST' });
+            await fetch('/login/api/logout', { method: 'POST' });
         } catch {}
         sessionStorage.clear();
-        window.location.href = '/stenographist/login';
+        window.location.href = '/login';
     });
 
     // --- Tabs ---

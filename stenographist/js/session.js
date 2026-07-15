@@ -305,7 +305,7 @@ const Session = (() => {
         await sendEvent('logout');
         deleteCookie('session_id');
         deleteCookie('inactive_since');
-        window.location.href = '/stenographist/login';
+        window.location.href = '/login';
     }
 
     async function checkSession() {
