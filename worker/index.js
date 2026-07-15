@@ -428,6 +428,11 @@ async function handleAuth(request, env) {
             return jsonResponse({ error: 'Неправильный логин или пароль' }, 401);
         }
 
+        const authFrom = new URL(request.url).searchParams.get('from');
+        if (authFrom === 'mail' && !isRoot) {
+            return jsonResponse({ error: 'Неправильный логин или пароль' }, 401);
+        }
+
         const sessionId = await createSession(env, username, isRoot);
 
         // Also create/update stenographist session with role

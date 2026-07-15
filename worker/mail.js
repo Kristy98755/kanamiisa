@@ -162,6 +162,11 @@ export async function mailFetch(request, env) {
     return Response.redirect(new URL("/login?from=mail", request.url), 302);
   }
 
+  if (!session.is_root) {
+    if (isApi) return json({ error: "unauthorized" }, 401);
+    return Response.redirect(new URL("/login?from=mail", request.url), 302);
+  }
+
   if (url.pathname === "/mail" || url.pathname === "/mail/") {
     return new Response(MAIL_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
   }
@@ -195,7 +200,9 @@ export const MAIL_HTML = `<!doctype html>
   * { box-sizing: border-box; }
   body { margin:0; font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:#0f1115; color:#e6e6e6; }
   header { padding:10px 16px; background:#171a21; border-bottom:1px solid #262b36; display:flex; gap:10px; align-items:center; }
-  header b { font-size:16px; }
+   header b { font-size:16px; }
+   .navlink { color:#cdd3dd; text-decoration:none; font-size:13px; padding:6px 10px; border-radius:8px; }
+   .navlink:hover { background:#1b1f27; }
   .pill { font-size:11px; padding:1px 8px; border-radius:999px; background:#3a2a12; color:#ffcf8e; }
   .wrap { display:grid; grid-template-columns: 250px 380px 1fr; height: calc(100vh - 45px); }
   .col { overflow:auto; border-right:1px solid #262b36; }
@@ -241,6 +248,9 @@ export const MAIL_HTML = `<!doctype html>
 <header>
   <b>kanamiisa mail</b><span class="pill">эмуляция</span>
   <span style="flex:1"></span>
+  <a class="navlink" href="/stenographist/panel.html">Панель</a>
+  <a class="navlink" href="/stenographist/index.html">Стенографист</a>
+  <button class="btn ghost" id="logout">Выйти</button>
   <span id="stat" style="color:#7c8696; font-size:12px;"></span>
 </header>
 <div class="wrap">
@@ -280,7 +290,7 @@ const S = { folder:'inbox', alias:null, q:'', selected:new Set(), openId:null };
 
 async function api(path, opts){
   const r = await fetch(path, opts);
-  if(r.status === 401){ location.href = '/login'; throw new Error('unauthorized'); }
+  if(r.status === 401){ location.href = '/login?from=mail'; throw new Error('unauthorized'); }
   return r.json();
 }
 async function loadState(){
@@ -392,6 +402,10 @@ document.getElementById('selall').addEventListener('change', (e) => {
 });
 document.querySelectorAll('.toolbar [data-act]').forEach(b => b.addEventListener('click', () => bulk(b.dataset.act)));
 document.getElementById('refresh').addEventListener('click', () => { loadState(); loadMessages(); });
+document.getElementById('logout').addEventListener('click', async () => {
+  await fetch('/login/api/logout', { method: 'POST' }).catch(() => {});
+  location.href = '/login';
+});
 function debounce(fn, ms){ let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 
 loadState();
