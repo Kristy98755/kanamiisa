@@ -174,21 +174,64 @@ export async function listUsers(env) {
 /**
  * Save login log
  */
-export async function saveLog(env, username, ip, userAgent, deviceInfo, sessionStart) {
-    const timestamp = Date.now();
-    const logEntry = {
+const LEX = {
+    'Windows': 'Wi', 'macOS': 'Ma', 'Linux': 'Li', 'Android': 'An', 'iOS': 'iO',
+    'Chrome': 'Ch', 'Firefox': 'Fx', 'Edge': 'Ed', 'Safari': 'Sa',
+    'Google Inc.': 'gI', 'Google Inc': 'gI', 'Apple Inc.': 'aI', 'Apple Inc': 'aI',
+    'slow-2g': 's2', 'wifi': 'wf', 'cellular': 'cl', 'ethernet': 'et', 'bluetooth': 'bt',
+    'landscape-primary': 'lp', 'landscape-secondary': 'ls', 'portrait-primary': 'pp', 'portrait-secondary': 'ps'
+};
+const UA_LEX = [
+    ['Mozilla/5.0', 'M5'],
+    ['AppleWebKit/537.36', 'AW'],
+    ['KHTML, like Gecko', 'lkGk'],
+    ['Gecko/20100101', 'Gk'],
+    ['Chrome/', 'Ch/'],
+    ['Safari/', 'Sa/'],
+    ['Edg/', 'Ed/'],
+    ['Firefox/', 'Fx/'],
+    ['Version/', 'Vr/'],
+    ['Win64; x64', 'W64'],
+    ['Windows NT 10.0', 'W10'],
+    ['Macintosh; Intel Mac OS X', 'MOS'],
+    ['X11; Linux x86_64', 'LX']
+];
+
+function lexCompressStr(v) {
+    if (typeof v !== 'string') return v;
+    if (LEX[v] !== undefined) return LEX[v];
+    if (/Mozilla|Gecko|AppleWebKit|Chrome|Firefox|Edge|Safari/.test(v)) {
+        let s = v;
+        for (const [orig, tok] of UA_LEX) s = s.split(orig).join(tok);
+        return s;
+    }
+    return v;
+}
+function lexCompressObj(o) {
+    if (Array.isArray(o)) return o.map(lexCompressObj);
+    if (o && typeof o === 'object') {
+        const r = {};
+        for (const k in o) r[k] = lexCompressObj(o[k]);
+        return r;
+    }
+    return lexCompressStr(o);
+}
+
+export async function saveLog(env, username, ip, userAgent, deviceInfo, sessionStart, from, sessionId) {
+    const entry = {
         username,
         ip,
         user_agent: userAgent,
-        device: deviceInfo,
-        session_start: sessionStart
+        device: lexCompressObj(deviceInfo || {}),
+        session_start: sessionStart,
+        from: from || 'none',
+        session_id: sessionId || null
     };
 
-    await env.AUTH_KV.put(
-        `log:${timestamp}:${username}`,
-        JSON.stringify(logEntry),
-        { expirationTtl: 86400 * 30 } // 30 days
-    );
+    let arr = await env.AUTH_KV.get('logindex', 'json') || [];
+    arr.unshift(entry);
+    if (arr.length > 2000) arr.length = 2000;
+    await env.AUTH_KV.put('logindex', JSON.stringify(arr));
 }
 
 /**

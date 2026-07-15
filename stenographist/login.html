@@ -258,7 +258,7 @@
                 const res = await fetch('/login/api/auth?from=' + encodeURIComponent(LOGIN_FROM), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password, clientInfo })
+                    body: JSON.stringify({ username, password, clientInfo, from: LOGIN_FROM })
                 });
 
                 const data = await res.json();

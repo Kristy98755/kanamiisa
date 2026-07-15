@@ -120,6 +120,10 @@ export default {
                 if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
                 return handleListLogs(env);
             }
+            if (subpath === 'api/logs' && request.method === 'DELETE') {
+                if (!session.is_root) return jsonResponse({ error: 'Forbidden' }, 403);
+                return handleDeleteLogs(request, env);
+            }
             if (subpath === 'api/process' && request.method === 'POST') {
                 return handleProcess(request, env);
             }
@@ -481,7 +485,7 @@ async function handleAuth(request, env) {
         const ua = request.headers.get('user-agent') || 'unknown';
         const serverInfo = await extractDeviceInfo(request);
         const deviceInfo = { ...serverInfo, ...(clientInfo || {}) };
-        await saveLog(env, username, ip, ua, deviceInfo, Date.now());
+        await saveLog(env, username, ip, ua, deviceInfo, Date.now(), authFrom, stenoSessionId);
 
         const headers = new Headers({ 'Content-Type': 'application/json' });
         headers.append('Set-Cookie', `session=${sessionId}; Path=/; HttpOnly; SameSite=Strict`);
@@ -617,66 +621,67 @@ async function handleUpdatePassword(username, request, env) {
 // Logs
 // ============================================================
 
+function normalizeLog(e) {
+    const d = e.device || {};
+    return {
+        session_id: e.session_id || null,
+        username: e.username,
+        ip: e.ip,
+        user_agent: e.user_agent,
+        session_start: e.session_start,
+        last_seen: null,
+        active: false,
+        failedAttempts: 0,
+        from: e.from || 'none',
+        device: {
+            country: d.country,
+            platform: d.platform,
+            browser: d.browser,
+            raw: d.raw || e.user_agent
+        },
+        network: d.network || null,
+        battery: d.battery || null,
+        gpu: d.gpu || null,
+        memory: d.memory || null,
+        navigator: d.navigator || null,
+        screen: d.screen || null,
+        window: d.window || null,
+        timezone: d.timezone || null
+    };
+}
+
 async function handleListLogs(env) {
-    const logs = [];
-
-    // 1. Read old login logs from auth.js (log:* prefix)
-    const oldKeys = await env.AUTH_KV.list({ prefix: 'log:', limit: 100 });
-    for (const key of oldKeys.keys) {
-        const data = await env.AUTH_KV.get(key.name, 'json');
-        if (!data) continue;
-        logs.push({
-            session_id: null,
-            username: data.username,
-            ip: data.ip,
-            user_agent: data.user_agent,
-            session_start: data.session_start,
-            last_seen: null,
-            active: false,
-            failedAttempts: 0,
-            device: data.device || {},
-            network: null, battery: null, gpu: null, memory: null,
-            navigator: null, screen: null, window: null, timezone: null
-        });
+    let arr = await env.AUTH_KV.get('logindex', 'json');
+    if (!arr) {
+        arr = [];
+        try {
+            const keys = await env.AUTH_KV.list({ prefix: 'log:' });
+            for (const key of keys.keys) {
+                const d = await env.AUTH_KV.get(key.name, 'json');
+                if (d) arr.push(d);
+            }
+            arr.sort((a, b) => (b.session_start || 0) - (a.session_start || 0));
+            if (arr.length > 2000) arr = arr.slice(0, 2000);
+            await env.AUTH_KV.put('logindex', JSON.stringify(arr));
+            for (const key of keys.keys) await env.AUTH_KV.delete(key.name);
+        } catch (err) {
+            console.error('log migration error:', err);
+        }
     }
-
-    // 2. Read stenographist sessions (session:* prefix)
-    const sessionKeys = await env.AUTH_KV.list({ prefix: 'session:' });
-    for (const key of sessionKeys.keys) {
-        const s = await env.AUTH_KV.get(key.name, 'json');
-        if (!s) continue;
-
-        const fp = s.fingerprint || {};
-        const isActive = (Date.now() - new Date(s.lastSeen).getTime()) < 120000;
-
-        logs.push({
-            session_id: s.id,
-            username: s.username,
-            ip: s.ip,
-            user_agent: s.userAgent,
-            session_start: s.created,
-            last_seen: s.lastSeen,
-            active: isActive,
-            failedAttempts: s.failedAttempts || 0,
-            device: {
-                country: s.country,
-                platform: fp.navigator?.platform || fp.navigator?.userAgentData?.platform || '-',
-                browser: parseBrowser(s.userAgent),
-                raw: s.userAgent
-            },
-            network: fp.network || fp.navigator?.connection || null,
-            battery: fp.battery || null,
-            gpu: fp.webgl || null,
-            memory: fp.memory || fp.cpu || null,
-            navigator: fp.navigator || null,
-            screen: fp.screen || null,
-            window: fp.window || null,
-            timezone: fp.datetime || fp.intl || null
-        });
-    }
-
-    logs.sort((a, b) => new Date(b.session_start || 0) - new Date(a.session_start || 0));
+    arr = arr || [];
+    const logs = arr.map(normalizeLog).sort((a, b) => (b.session_start || 0) - (a.session_start || 0));
     return jsonResponse({ logs });
+}
+
+async function handleDeleteLogs(request, env) {
+    const { from, to } = await request.json().catch(() => ({}));
+    let arr = await env.AUTH_KV.get('logindex', 'json') || [];
+    const f = from ? new Date(from).getTime() : 0;
+    const t = to ? new Date(to + 'T23:59:59').getTime() : Date.now();
+    const before = arr.length;
+    arr = arr.filter(e => !((e.session_start || 0) >= f && (e.session_start || 0) <= t));
+    await env.AUTH_KV.put('logindex', JSON.stringify(arr));
+    return jsonResponse({ ok: true, removed: before - arr.length });
 }
 
 function parseBrowser(ua) {

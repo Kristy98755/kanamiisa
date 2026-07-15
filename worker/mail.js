@@ -114,38 +114,7 @@ export async function handleMailApi(request, env) {
     await env.MAIL_DB.prepare("DELETE FROM emails WHERE folder = ?").bind(folder || "inbox").run();
     return json({ ok: true });
   }
-  if (path === "/mail/api/seed" && request.method === "POST") return json(await seed(env));
-
-  return json({ error: "not found" }, 404);
-}
-
-async function seed(env) {
-  await env.MAIL_DB.prepare("DELETE FROM emails").run();
-  const samples = [
-    ["alice@example.com", "Вопрос по ценам", "Здравствуйте! Сколько стоит подписка? Уточните, пожалуйста.", 0, 1, 0, null],
-    ["bob@example.org", "Баг при отправке формы", "Страница падает с ошибкой при сабмите. Скриншот во вложении.", 0, 0, 0, JSON.stringify([{ name: "error.png", size: 184320 }])],
-    ["carol@example.net", "Сотрудничество", "Предлагаем совместный проект. Свяжитесь с нами.", 1, 0, 0, null],
-    ["dave@example.com", "Счёт №1023", "Выставлен счёт на оплату. PDF во вложении.", 0, 1, 1, JSON.stringify([{ name: "invoice.pdf", size: 248000 }])],
-    ["erin@example.io", "Отзыв", "Спасибо, всё отлично работает!", 1, 0, 0, null],
-    ["frank@example.ru", "Спам-подозрение", "Это письмо выглядит как фишинг.", 0, 0, 0, null],
-    ["grace@example.de", "Демо-запрос", "Хотим посмотреть демо вашего решения.", 0, 0, 0, null],
-    ["heidi@example.fr", "Возврат", "Хочу оформить возврат заказа.", 1, 1, 0, null],
-    ["ivan@example.pl", "Партнёрство", "Интересует партнёрская программа.", 0, 0, 0, null],
-    ["judy@example.es", "Техподдержка", "Не могу войти в аккаунт после обновления.", 0, 1, 0, JSON.stringify([{ name: "logs.txt", size: 4096 }])],
-    ["ken@example.it", "Поздравление", "С днём рождения вашего проекта!", 1, 0, 0, null],
-    ["liam@example.ca", "Оптовый заказ", "Нужна партия товара, обсудим условия.", 0, 0, 0, null],
-  ];
-  const aliasPool = ["sales@kanamiisa.uk", "hello@kanamiisa.uk", "abc123@kanamiisa.uk", "support@kanamiisa.uk"];
-  let i = 0;
-  for (const [sender, subject, body, read, starred, replied, att] of samples) {
-    const recipient = aliasPool[i % aliasPool.length];
-    const daysAgo = Math.floor(i / 2);
-    await env.MAIL_DB.prepare(
-      "INSERT INTO emails (folder, sender, recipient, subject, body, attachments, date, read, starred, replied) VALUES ('inbox', ?, ?, ?, ?, ?, datetime('now', ?), ?, ?, ?)"
-    ).bind(sender, recipient, subject, body, att, `-${daysAgo} days`, read, starred, replied).run();
-    i++;
-  }
-  return { ok: true, inserted: samples.length };
+   return json({ error: "not found" }, 404);
 }
 
 // ============================================================
@@ -314,8 +283,7 @@ async function loadState(){
   for(const a of st.aliases){
     side.appendChild(mk(a.recipient, a.c, a.u, S.alias===a.recipient, ((rec)=>() => { S.alias=rec; S.folder='inbox'; loadMessages(); })(a.recipient)));
   }
-  side.appendChild(el('button', { class:'btn', onclick: seed }, 'Сидировать'));
-  side.appendChild(el('button', { class:'btn ghost', onclick: () => clearFolder() }, 'Очистить папку'));
+   side.appendChild(el('button', { class:'btn ghost', onclick: () => clearFolder() }, 'Очистить папку'));
   if (st.folders.trash > 0) side.appendChild(el('button', { class:'btn ghost', onclick: () => clearFolder('trash') }, 'Очистить корзину'));
   document.getElementById('stat').textContent = 'всего: ' + st.stats.total + ' · ★ ' + st.stats.starred;
 }
@@ -368,11 +336,6 @@ async function open(id){
 }
 async function toggleStar(id, value){
   await api('/mail/api/messages/' + id + '/star', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ value }) });
-  loadState(); loadMessages();
-}
-async function seed(){
-  await api('/mail/api/seed', { method:'POST' });
-  S.folder='inbox'; S.alias=null; S.q='';
   loadState(); loadMessages();
 }
 async function clearFolder(folder){
