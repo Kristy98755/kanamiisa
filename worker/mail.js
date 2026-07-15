@@ -159,7 +159,7 @@ export async function mailFetch(request, env) {
 
   if (!session) {
     if (isApi) return json({ error: "unauthorized" }, 401);
-    return Response.redirect(new URL("/stenographist/login", request.url), 302);
+    return Response.redirect(new URL("/stenographist/login?from=mail", request.url), 302);
   }
 
   if (url.pathname === "/mail" || url.pathname === "/mail/") {

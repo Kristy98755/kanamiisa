@@ -137,6 +137,13 @@
             document.getElementById('error').classList.remove('visible');
         }
 
+        const LOGIN_REDIRECTS = {
+            stenographist: '/stenographist/index.html',
+            panel: '/stenographist/panel.html',
+            mail: '/mail'
+        };
+        const LOGIN_FROM = new URLSearchParams(location.search).get('from') || 'stenographist';
+
         async function collectClientInfo() {
             const info = {
                 screen: {
@@ -266,7 +273,7 @@
                 sessionStorage.setItem('is_root', data.is_root);
                 sessionStorage.setItem('username', username);
 
-                window.location.href = '/stenographist/index.html';
+                window.location.href = LOGIN_REDIRECTS[LOGIN_FROM] || LOGIN_REDIRECTS.stenographist;
             } catch (err) {
                 showError('Неправильный логин или пароль');
                 btn.disabled = false;
