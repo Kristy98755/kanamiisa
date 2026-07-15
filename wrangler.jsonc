@@ -17,6 +17,13 @@
       "id": "072e1df22e17491287febbc77eb72e47"
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "MAIL_DB",
+      "database_name": "kanamiisa_mail",
+      "database_id": "89036ca8-e0d9-4bb8-9185-50f205770ce9"
+    }
+  ],
   "compatibility_flags": [
     "nodejs_compat"
   ]

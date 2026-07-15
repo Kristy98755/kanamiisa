@@ -9,6 +9,7 @@ import {
     deleteSession, getUser, saveUser, deleteUser, listUsers,
     saveLog, listLogs, saveTOTPSecret, getTOTPSecret, validateSetupAuth
 } from './auth.js';
+import { mailFetch, mailEmail } from './mail.js';
 
 export default {
     async fetch(request, env) {
@@ -109,11 +110,20 @@ export default {
             return serveFile(env, path.slice(1));
         }
 
+        // === Mail routes (auth-gated via session system) ===
+        if (path === '/mail' || path === '/mail/' || path.startsWith('/mail/api/')) {
+            return mailFetch(request, env);
+        }
+
         // Everything else: serve static files directly
         if (path === '/' || path === '') {
             return serveFile(env, 'index.html');
         }
         return serveFile(env, path.slice(1));
+    },
+
+    async email(message, env, ctx) {
+        return mailEmail(message, env, ctx);
     }
 };
 
