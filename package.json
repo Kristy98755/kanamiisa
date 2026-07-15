@@ -1,0 +1,12 @@
+{
+  "name": "kanamiisa",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "nodemailer": "^6.10.1",
+    "postal-mime": "^2.4.1"
+  }
+}

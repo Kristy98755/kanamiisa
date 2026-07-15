@@ -1,0 +1,6 @@
+.git
+.wrangler
+node_modules
+tmp
+cache
+state

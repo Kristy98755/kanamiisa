@@ -1,10 +1,15 @@
 /**
- * Mail module — emulated mailbox web client.
- * Auth reuses the project's session system (validateSession / session= cookie in AUTH_KV).
- * Sending is NOT implemented yet. Receiving is stubbed (Cloudflare Email Routing -> mailEmail).
+ * Mail module — real mailbox backed by Cloudflare Email Routing (inbound)
+ * and Cloudflare Email Sending (outbound). Auth reuses the project's
+ * session system (validateSession / session= cookie in AUTH_KV).
  */
 
 import { validateSession } from './auth.js';
+import PostalMime from 'postal-mime';
+import nodemailer from 'nodemailer';
+
+const SENDER = 'support@kanamiisa.uk';
+const SENDER_NAME = 'kanamiisa';
 
 // ============================================================
 // API
@@ -16,6 +21,7 @@ function json(data, status = 200) {
 
 async function getState(env) {
   const inbox = await env.MAIL_DB.prepare("SELECT COUNT(*) c, COALESCE(SUM(1-read),0) u FROM emails WHERE folder='inbox'").first();
+  const sent = await env.MAIL_DB.prepare("SELECT COUNT(*) c FROM emails WHERE folder='sent'").first();
   const trash = await env.MAIL_DB.prepare("SELECT COUNT(*) c FROM emails WHERE folder='trash'").first();
   const aliases = await env.MAIL_DB.prepare(
     "SELECT recipient, COUNT(*) c, COALESCE(SUM(1-read),0) u FROM emails WHERE folder='inbox' GROUP BY recipient ORDER BY recipient"
@@ -23,7 +29,7 @@ async function getState(env) {
   const total = await env.MAIL_DB.prepare("SELECT COUNT(*) c FROM emails").first();
   const starred = await env.MAIL_DB.prepare("SELECT COUNT(*) c FROM emails WHERE starred=1").first();
   return {
-    folders: { inbox: inbox.c, inboxUnread: inbox.u, trash: trash.c },
+    folders: { inbox: inbox.c, inboxUnread: inbox.u, sent: sent.c, trash: trash.c },
     aliases: aliases.results,
     stats: { total: total.c, starred: starred.c },
   };
@@ -32,6 +38,21 @@ async function getState(env) {
 function snippet(body, n = 120) {
   const t = (body || "").replace(/\s+/g, " ").trim();
   return t.length > n ? t.slice(0, n) + "…" : t;
+}
+
+function stripHtml(html) {
+  return (html || "")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<br\s*\/?>(?=)/gi, " ")
+    .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 async function listMessages(env, url) {
@@ -43,16 +64,16 @@ async function listMessages(env, url) {
   if (p.get("unread") === "1") where.push("read = 0");
   if (p.get("starred") === "1") where.push("starred = 1");
   if (p.get("q")) {
-    where.push("(sender LIKE ? OR subject LIKE ? OR body LIKE ?)");
-    binds.push("%" + p.get("q") + "%", "%" + p.get("q") + "%", "%" + p.get("q") + "%");
+    where.push("(sender LIKE ? OR recipient LIKE ? OR subject LIKE ? OR body LIKE ?)");
+    binds.push("%" + p.get("q") + "%", "%" + p.get("q") + "%", "%" + p.get("q") + "%", "%" + p.get("q") + "%");
   }
-  const sql = "SELECT id, sender, recipient, subject, body, date, read, starred, replied, attachments FROM emails"
+  const sql = "SELECT id, sender, recipient, from_name, subject, body, date, read, starred, replied, folder, attachments FROM emails"
     + (where.length ? " WHERE " + where.join(" AND ") : "")
     + " ORDER BY id DESC";
   const { results } = await env.MAIL_DB.prepare(sql).bind(...binds).all();
   return results.map((m) => ({
-    id: m.id, sender: m.sender, recipient: m.recipient, subject: m.subject,
-    snippet: snippet(m.body), date: m.date, read: m.read, starred: m.starred,
+    id: m.id, sender: m.sender, recipient: m.recipient, fromName: m.from_name, folder: m.folder,
+    subject: m.subject, snippet: snippet(m.body), date: m.date, read: m.read, starred: m.starred,
     replied: m.replied, hasAttach: !!(m.attachments && m.attachments !== "[]" && m.attachments !== "null"),
   }));
 }
@@ -62,11 +83,66 @@ async function setFlag(env, id, col, value) {
   return json({ ok: true });
 }
 
+async function handleMailSend(request, env) {
+  const data = await request.json().catch(() => ({}));
+  const to = (data.to || "").trim();
+  const subject = (data.subject || "").trim();
+  const body = data.body || "";
+  const html = data.html || "";
+  const inReplyTo = data.inReplyTo || null;
+  const replyTo = data.replyTo || null;
+  if (!to) return json({ error: "no recipient" }, 400);
+  if (!env.SMTP_HOST || !env.SMTP_PASS) return json({ error: "smtp not configured" }, 503);
+
+  const transport = nodemailer.createTransport({
+    host: env.SMTP_HOST,
+    port: parseInt(env.SMTP_PORT || "587", 10),
+    secure: env.SMTP_PORT === "465" || env.SMTP_SECURE === "1",
+    auth: { user: env.SMTP_USER || env.MAIL_FROM || SENDER, pass: env.SMTP_PASS },
+  });
+
+  const attachments = (data.attachments || [])
+    .filter((a) => a.content)
+    .map((a) => ({
+      filename: a.filename || "attachment",
+      content: a.content,
+      encoding: "base64",
+      contentType: a.type || "application/octet-stream",
+    }));
+
+  try {
+    const info = await transport.sendMail({
+      from: { name: SENDER_NAME, address: env.MAIL_FROM || SENDER },
+      to,
+      subject: subject || "(без темы)",
+      text: body,
+      html: html || undefined,
+      replyTo: replyTo || undefined,
+      inReplyTo: inReplyTo || undefined,
+      attachments,
+    });
+    const messageId = info && info.messageId ? info.messageId : null;
+    await env.MAIL_DB.prepare(
+      `INSERT INTO emails (folder, sender, recipient, from_name, subject, body, body_html, html, date, message_id, in_reply_to, attachments, read)
+       VALUES ('sent', ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, 1)`
+    ).bind(
+      SENDER, to, SENDER_NAME, subject, body, html || null, html ? 1 : 0, messageId, inReplyTo,
+      JSON.stringify(attachments.map((a) => ({ name: a.filename, type: a.contentType, size: Math.ceil((a.content.length * 3) / 4) })))
+    ).run();
+    return json({ ok: true, messageId });
+  } catch (e) {
+    console.error("[mail] smtp send failed", e);
+    return json({ error: e.message || "send failed" }, 500);
+  }
+}
+
 export async function handleMailApi(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
 
   if (path === "/mail/api/state" && request.method === "GET") return json(await getState(env));
+
+  if (path === "/mail/api/send" && request.method === "POST") return handleMailSend(request, env);
 
   if (path === "/mail/api/messages" && request.method === "GET") return json(await listMessages(env, url));
 
@@ -143,15 +219,51 @@ export async function mailFetch(request, env) {
   return new Response("Not found", { status: 404 });
 }
 
-// Inbound email path — STUB. Real worker will store here via Cloudflare Email Routing.
+// Inbound email path — real handler driven by Cloudflare Email Routing.
 export async function mailEmail(message, env, ctx) {
-  const subject = message.headers.get("subject") || "(no subject)";
-  console.log(`[mail] inbound email ${message.from} -> ${message.to}: ${subject}`);
-  ctx.waitUntil(
-    env.MAIL_DB.prepare(
-      "INSERT INTO emails (sender, recipient, subject, body, date) VALUES (?, ?, ?, ?, datetime('now'))"
-    ).bind(message.from, message.to, subject, "(raw body stored on real worker)").run()
-  );
+  ctx.waitUntil((async () => {
+    try {
+      const raw = await new Response(message.raw).arrayBuffer();
+      const email = await PostalMime.parse(raw);
+      const text = email.text || (email.html ? stripHtml(email.html) : "") || "";
+      let dateStr = null;
+      if (email.date) {
+        const dt = new Date(email.date);
+        if (!isNaN(dt)) dateStr = dt.toISOString().slice(0, 19).replace("T", " ");
+      }
+      if (!dateStr) dateStr = new Date().toISOString().slice(0, 19).replace("T", " ");
+      const atts = (email.attachments || []).map((a) => ({
+        name: a.filename || "attachment",
+        type: a.mimeType || "application/octet-stream",
+        size: a.size || 0,
+      }));
+      await env.MAIL_DB.prepare(
+        `INSERT INTO emails (folder, sender, recipient, from_name, subject, body, body_html, html, date, message_id, in_reply_to, reply_to, attachments, read)
+         VALUES ('inbox', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
+      ).bind(
+        email.from?.address || message.from,
+        message.to,
+        email.from?.name || null,
+        email.subject || "(без темы)",
+        text,
+        email.html || null,
+        email.html ? 1 : 0,
+        dateStr,
+        email.messageId || null,
+        email.inReplyTo || null,
+        email.replyTo?.address || null,
+        JSON.stringify(atts)
+      ).run();
+      console.log(`[mail] stored inbound ${message.from} -> ${message.to}: ${email.subject}`);
+    } catch (e) {
+      console.error("[mail] parse failed", e);
+      try {
+        await env.MAIL_DB.prepare(
+          "INSERT INTO emails (folder, sender, recipient, subject, body, date, read) VALUES ('inbox', ?, ?, ?, ?, datetime('now'), 0)"
+        ).bind(message.from, message.to, "(не удалось разобрать письмо)", "(raw body unavailable)").run();
+      } catch (_) {}
+    }
+  })());
 }
 
 // ============================================================
@@ -172,7 +284,7 @@ export const MAIL_HTML = `<!doctype html>
    header b { font-size:16px; }
    .navlink { color:#cdd3dd; text-decoration:none; font-size:13px; padding:6px 10px; border-radius:8px; }
    .navlink:hover { background:#1b1f27; }
-  .pill { font-size:11px; padding:1px 8px; border-radius:999px; background:#3a2a12; color:#ffcf8e; }
+  .pill { font-size:11px; padding:1px 8px; border-radius:999px; background:#123524; color:#7ff0a8; }
   .wrap { display:grid; grid-template-columns: 250px 380px 1fr; height: calc(100vh - 45px); }
   .col { overflow:auto; border-right:1px solid #262b36; }
   .col.view { border-right:0; padding:22px; }
@@ -211,11 +323,12 @@ export const MAIL_HTML = `<!doctype html>
   .chip { display:inline-flex; gap:6px; align-items:center; background:#1a2230; border:1px solid #2a3344; border-radius:8px; padding:5px 10px; margin:4px 4px 0 0; font-size:12px; }
   .note { color:#ffcf8e; font-size:12px; margin-top:14px; }
   input[type=checkbox]{ width:15px; height:15px; accent-color:#2563eb; }
+  .compose label { display:block; color:#7c8696; font-size:12px; margin:6px 2px 2px; }
 </style>
 </head>
 <body>
 <header>
-  <b>kanamiisa mail</b><span class="pill">эмуляция</span>
+  <b>kanamiisa mail</b><span class="pill">support@kanamiisa.uk</span>
   <span style="flex:1"></span>
   <a class="navlink" href="/stenographist/panel.html">Панель</a>
   <a class="navlink" href="/stenographist/index.html">Стенографист</a>
@@ -233,11 +346,23 @@ export const MAIL_HTML = `<!doctype html>
       <button class="btn ghost" data-act="unstar">☆</button>
       <button class="btn ghost" data-act="delete">Удалить</button>
       <button class="btn ghost" id="refresh">Обновить</button>
-      <button class="btn" disabled title="отправка не реализована">Написать</button>
+      <button class="btn" id="compose-btn">Написать</button>
     </div>
     <div class="col" id="list" style="height:calc(100vh - 45px - 45px);"></div>
   </div>
   <div class="col view" id="view"><div class="empty">Выберите письмо слева.</div></div>
+</div>
+
+<div id="compose" class="compose" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:50; align-items:flex-start; justify-content:center; padding-top:40px;">
+  <div style="background:#171a21; border:1px solid #262b36; border-radius:12px; width:min(640px,92vw); max-height:90vh; overflow:auto; padding:16px;">
+    <div style="display:flex;align-items:center;margin-bottom:6px;"><b style="font-size:15px;">Новое письмо</b><span style="flex:1"></span><button class="btn ghost" id="c-close">Закрыть</button></div>
+    <label>Кому</label><input id="c-to" class="search" style="margin-bottom:8px;">
+    <label>Тема</label><input id="c-subject" class="search" style="margin-bottom:8px;">
+    <label>Текст</label><textarea id="c-body" style="width:100%;min-height:160px;background:#0c0e13;color:#e6e6e6;border:1px solid #2a2f3a;border-radius:8px;padding:10px;font:14px/1.5 system-ui;"></textarea>
+    <label>Вложения</label><input id="c-files" type="file" multiple style="margin:4px 0 12px;color:#cdd3dd;">
+    <div id="c-err" class="note" style="display:none"></div>
+    <button class="btn" id="c-send">Отправить</button>
+  </div>
 </div>
 
 <script>
@@ -247,6 +372,7 @@ function el(tag, attrs, ...kids){
     const v = attrs[k];
     if(k === 'class') e.className = v;
     else if(k === 'html') e.innerHTML = v;
+    else if(k === 'style' && typeof v === 'object') e.setAttribute('style', Object.entries(v).map(([x,y])=>x+':'+y).join(';'));
     else if(k.slice(0,2) === 'on' && typeof v === 'function') e.addEventListener(k.slice(2), v);
     else if(v !== false && v != null) e.setAttribute(k, v);
   }
@@ -278,6 +404,7 @@ async function loadState(){
   };
   side.appendChild(el('h4', null, 'Папки'));
   side.appendChild(mk('Входящие', st.folders.inbox, st.folders.inboxUnread, S.folder==='inbox' && !S.alias, () => { S.folder='inbox'; S.alias=null; loadMessages(); }));
+  side.appendChild(mk('Отправленные', st.folders.sent, null, S.folder==='sent', () => { S.folder='sent'; S.alias=null; loadMessages(); }));
   side.appendChild(mk('Корзина', st.folders.trash, null, S.folder==='trash', () => { S.folder='trash'; S.alias=null; loadMessages(); }));
   side.appendChild(el('h4', null, 'Ящики (алиасы)'));
   for(const a of st.aliases){
@@ -296,14 +423,15 @@ async function loadMessages(){
   const list = await api('/mail/api/messages?' + qs.toString());
   const box = document.getElementById('list');
   box.innerHTML = '';
-  if(!list.length){ box.appendChild(el('div', { class:'empty' }, 'Пусто. Нажмите «Сидировать».')); return; }
+  if(!list.length){ box.appendChild(el('div', { class:'empty' }, 'Пусто.')); return; }
   for(const m of list){
+    const who = (S.folder==='sent') ? m.recipient : (m.fromName ? m.fromName + ' <' + m.sender + '>' : m.sender);
     const row = el('div', { class:'item' + (m.read?'':' unread') + (S.openId===m.id?' active':''), onclick: () => open(m.id) },
       el('input', { type:'checkbox', class:'rowcb', 'data-id': m.id, onclick:(e)=>{ e.stopPropagation(); if(e.target.checked) S.selected.add(m.id); else S.selected.delete(m.id); } }),
       el('span', { class:'star' + (m.starred?' on':''), onclick:(e)=>{ e.stopPropagation(); toggleStar(m.id, !m.starred); } }, m.starred?'★':'☆'),
       el('div', { class:'main' },
         el('div', { class:'row1' },
-          el('span', { class:'s' }, m.sender),
+          el('span', { class:'s' }, who),
           el('span', { class:'meta' }, fmtDate(m.date).split(',')[1] || fmtDate(m.date))
         ),
         el('div', { class:'sub' }, (m.subject||'(без темы)')),
@@ -324,15 +452,32 @@ async function open(id){
   const v = document.getElementById('view');
   v.innerHTML = '';
   const atts = (m.attachments && m.attachments !== 'null') ? JSON.parse(m.attachments||'[]') : [];
-  const chips = atts.length ? el('div', { class:'chips' }, atts.map(a => el('span', { class:'chip' }, '📎 ' + a.name + ' (' + (a.size/1024).toFixed(0) + ' KB)'))) : null;
-  v.appendChild(el('div', { class:'msg' },
+  const chips = atts.length ? el('div', { class:'chips' }, atts.map(a => el('span', { class:'chip' }, '📎 ' + a.name + ' (' + ((a.size||0)/1024).toFixed(0) + ' KB)'))) : null;
+
+  const bodyWrap = el('div', { class:'body' }, m.body || '(нет текстовой части)');
+  const msg = el('div', { class:'msg' },
     el('h2', null, m.subject || '(без темы)'),
     el('div', { class:'hdr' }, 'от ' + m.sender + '  →  ' + m.recipient + '  ·  ' + fmtDate(m.date)),
-    el('div', { class:'body' }, m.body || ''),
-    chips,
-    el('div', { class:'note' }, 'Ответ и отправка пока не реализованы (только эмуляция приёма).')
-  ));
+    bodyWrap
+  );
+  if (m.body_html) {
+    const htmlBtn = el('button', { class:'btn ghost', style:{marginTop:'10px'}, onclick: () => {
+      const ifr = el('iframe', { sandbox:'', style:{width:'100%',minHeight:'320px',border:'1px solid #20262f',borderRadius:'10px',background:'#fff'} });
+      ifr.srcdoc = m.body_html;
+      bodyWrap.replaceWith(ifr);
+      htmlBtn.remove();
+    } }, 'Показать как HTML');
+    msg.appendChild(htmlBtn);
+  }
+  if (chips) msg.appendChild(chips);
+  if (S.folder !== 'sent') {
+    msg.appendChild(el('div', { class:'chips' }, el('button', { class:'btn', onclick: () => reply(m) }, 'Ответить')));
+  }
+  v.appendChild(msg);
   loadMessages();
+}
+async function reply(m){
+  compose({ to: m.sender, subject: 'Re: ' + (m.subject || ''), inReplyTo: m.message_id, body: '\\n\\n--- исходное письмо ---\\n' + (m.body||'') });
 }
 async function toggleStar(id, value){
   await api('/mail/api/messages/' + id + '/star', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ value }) });
@@ -355,6 +500,37 @@ async function bulk(action){
   document.getElementById('selall').checked = false;
   loadState(); loadMessages();
 }
+function compose(prefill){
+  prefill = prefill || {};
+  document.getElementById('c-to').value = prefill.to || '';
+  document.getElementById('c-subject').value = prefill.subject || '';
+  document.getElementById('c-body').value = prefill.body || '';
+  document.getElementById('c-files').value = '';
+  document.getElementById('c-err').style.display = 'none';
+  document.getElementById('compose').dataset.inReplyTo = prefill.inReplyTo || '';
+  document.getElementById('compose').style.display = 'flex';
+  document.getElementById('c-to').focus();
+}
+function closeCompose(){ document.getElementById('compose').style.display='none'; }
+function showErr(msg){ const e=document.getElementById('c-err'); e.textContent=msg; e.style.display='block'; }
+function fileToB64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>{ const b=r.result.split(',')[1]; res(b); }; r.onerror=rej; r.readAsDataURL(file); }); }
+async function sendMail(){
+  const to = document.getElementById('c-to').value.trim();
+  const subject = document.getElementById('c-subject').value.trim();
+  const body = document.getElementById('c-body').value;
+  const inReplyTo = document.getElementById('compose').dataset.inReplyTo || null;
+  if(!to){ showErr('Укажите получателя'); return; }
+  const files = document.getElementById('c-files').files;
+  const attachments = [];
+  for(const f of files){ attachments.push({ filename: f.name, type: f.type || 'application/octet-stream', content: await fileToB64(f) }); }
+  const btn = document.getElementById('c-send'); btn.disabled = true;
+  try{
+    const r = await fetch('/mail/api/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ to, subject, body, inReplyTo, attachments }) });
+    const j = await r.json();
+    if(!r.ok){ showErr(j.error || 'Ошибка отправки'); btn.disabled=false; return; }
+    closeCompose(); S.folder='sent'; S.alias=null; loadState(); loadMessages();
+  }catch(e){ showErr(e.message); btn.disabled=false; }
+}
 document.getElementById('selall').addEventListener('change', (e) => {
   const checked = e.target.checked;
   document.querySelectorAll('.item input.rowcb').forEach((cb) => {
@@ -369,10 +545,14 @@ document.getElementById('logout').addEventListener('click', async () => {
   await fetch('/login/api/logout', { method: 'POST' }).catch(() => {});
   location.href = '/login';
 });
+document.getElementById('compose-btn').addEventListener('click', () => compose());
+document.getElementById('c-close').addEventListener('click', closeCompose);
+document.getElementById('c-send').addEventListener('click', sendMail);
 function debounce(fn, ms){ let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 
 loadState();
 loadMessages();
 </script>
+<script src="/js/auto-logout.js"></script>
 </body>
 </html>`;

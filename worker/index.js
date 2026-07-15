@@ -31,6 +31,7 @@ export default {
                 return serveFile(env, 'stenographist/login/setup.html');
             }
             if (lsub === 'api/auth' && request.method === 'POST') return handleAuth(request, env);
+            if (lsub === 'api/session' && request.method === 'GET') return handleLoginSession(request, env);
             if (lsub === 'api/logout' && request.method === 'POST') return handleLogout(request, env);
             if (lsub === 'api/setup' && request.method === 'POST') return handleSetup(request, env);
             if (lsub === 'api/secret' && request.method === 'POST') return handleGetSecret(request, env);
@@ -498,6 +499,12 @@ async function handleAuth(request, env) {
     } catch (err) {
         return jsonResponse({ error: 'Неправильный логин или пароль' }, 401);
     }
+}
+
+async function handleLoginSession(request, env) {
+    const session = await validateSession(request, env);
+    if (!session) return jsonResponse({ valid: false });
+    return jsonResponse({ valid: true, is_root: !!session.is_root });
 }
 
 async function handleLogout(request, env) {
