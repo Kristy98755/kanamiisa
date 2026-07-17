@@ -19,6 +19,23 @@ function bytesToB64url(bytes) {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+function concatBytes(...arrs) {
+  let len = 0;
+  for (const a of arrs) len += a.length;
+  const out = new Uint8Array(len);
+  let off = 0;
+  for (const a of arrs) { out.set(a, off); off += a.length; }
+  return out;
+}
+
+function u16be(n) {
+  return new Uint8Array([(n >> 8) & 0xff, n & 0xff]);
+}
+
+function strToBytes(s) {
+  return new TextEncoder().encode(s);
+}
+
 async function importPrivate(env) {
   const bytes = b64urlToBytes(env.VAPID_PRIVATE);
   return crypto.subtle.importKey('pkcs8', bytes, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
@@ -59,29 +76,62 @@ export function getVapidPublic(env) {
   return env.VAPID_PUBLIC || '';
 }
 
+// RFC 8188 aes128gcm encryption of a push payload for a given subscription.
+async function encryptPayload(sub, payloadStr) {
+  const p256dh = b64urlToBytes(sub.keys.p256dh);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+
+  const ephemeral = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const ephemeralPub = new Uint8Array(await crypto.subtle.exportKey('raw', ephemeral.publicKey));
+
+  const recipientPub = await crypto.subtle.importKey('raw', p256dh, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+  const shared = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: 'ECDH', namedCurve: 'P-256', public: recipientPub },
+    ephemeral.privateKey, 256
+  ));
+
+  const hkdf = await crypto.subtle.importKey('raw', shared, { name: 'HKDF' }, false, ['deriveBits']);
+  const context = concatBytes(u16be(p256dh.length), p256dh, u16be(ephemeralPub.length), ephemeralPub);
+  const cekInfo = concatBytes(strToBytes('Content-Encoding: aes128gcm'), new Uint8Array([0]), strToBytes('WebPush: info'), new Uint8Array([0]), context);
+  const nonceInfo = concatBytes(strToBytes('Content-Encoding: nonce'), new Uint8Array([0]), strToBytes('WebPush: info'), new Uint8Array([0]), context);
+  const cek = new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info: cekInfo }, hkdf, 128));
+  const nonce = new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info: nonceInfo }, hkdf, 96));
+
+  const plaintext = concatBytes(strToBytes(payloadStr), new Uint8Array([0]));
+  const aesKey = await crypto.subtle.importKey('raw', cek, { name: 'AES-GCM' }, false, ['encrypt']);
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, plaintext));
+
+  const rs = new Uint8Array(4);
+  new DataView(rs.buffer).setUint32(0, 4096, false);
+  return concatBytes(salt, rs, new Uint8Array([ephemeralPub.length]), ephemeralPub, ciphertext);
+}
+
 async function sendToOne(env, sub, title, body, url) {
   const endpoint = sub.endpoint;
   const aud = new URL(endpoint).origin;
   const jwt = await makeJwt(env, aud);
+
+  const payload = JSON.stringify({
+    title,
+    body,
+    icon: '/k-logo.png',
+    badge: '/k-logo.png',
+    tag: 'newmail',
+    url: url || '/mail',
+  });
+
+  const bodyBytes = await encryptPayload(sub, payload);
+
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'TTL': '60',
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/octet-stream',
+      'Content-Encoding': 'aes128gcm',
       'Authorization': 'WebPush ' + jwt,
       'Crypto-Key': 'p256ecdsa=' + env.VAPID_PUBLIC,
     },
-    body: JSON.stringify({
-      notification: {
-        title,
-        body,
-        icon: '/k-logo.png',
-        badge: '/k-logo.png',
-        tag: 'newmail',
-        click_action: url || '/mail',
-        data: { url: url || '/mail' },
-      },
-    }),
+    body: bodyBytes,
   });
   if (res.status === 404 || res.status === 410) {
     await removeSubscription(env, endpoint);
