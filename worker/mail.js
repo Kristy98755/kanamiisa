@@ -316,7 +316,7 @@ export const MAIL_HTML = `<!doctype html>
    header b { font-size:16px; }
    .navlink { color:#cdd3dd; text-decoration:none; font-size:13px; padding:6px 10px; border-radius:8px; }
    .navlink:hover { background:#1b1f27; }
-  .pill { font-size:11px; padding:1px 8px; border-radius:999px; background:#2a0a26; color:#ff8be8; }
+  .pill { font-size:11px; padding:1px 8px; border-radius:999px; background:#06231f; color:#7df3e6; }
   .wrap { display:grid; grid-template-columns: 250px 380px 1fr; height: calc(100vh - 45px); }
   .col { overflow:auto; border-right:1px solid #262b36; }
   .col.view { border-right:0; padding:22px; }
@@ -324,27 +324,27 @@ export const MAIL_HTML = `<!doctype html>
   .side h4 { margin:14px 6px 6px; color:#7c8696; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
   .nav { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; cursor:pointer; }
   .nav:hover { background:#1b1f27; }
-  .nav.active { background:#2a0a26; box-shadow: inset 3px 0 0 #00f5d4; }
+  .nav.active { background:#06231f; box-shadow: inset 3px 0 0 #00f5d4, 0 0 18px rgba(0,245,212,.14); }
   .nav .count { margin-left:auto; color:#9aa4b2; font-size:12px; }
-  .nav .unread { background:#00f5d4; color:#04120f; border-radius:999px; padding:0 7px; font-size:11px; font-weight:600; }
+  .nav .unread { background:#00f5d4; color:#04120f; border-radius:999px; padding:0 7px; font-size:11px; font-weight:600; box-shadow:0 0 10px rgba(0,245,212,.5); }
   .search { width:100%; padding:8px 10px; margin:6px 0; background:#0c0e13; color:#e6e6e6; border:1px solid #2a2f3a; border-radius:8px; }
   .side .btn { width:100%; margin-top:6px; }
   .toolbar { display:flex; gap:6px; padding:8px 10px; border-bottom:1px solid #262b36; align-items:center; flex-wrap:wrap; }
-  .btn { background:#00f5d4; color:#04120f; border:0; padding:7px 12px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; box-shadow: 0 0 14px rgba(0,245,212,.45); }
-  .btn.ghost { background:#1c0f1f; color:#ff8be8; }
-  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn { background:#00f5d4; color:#04120f; border:0; padding:7px 12px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; box-shadow: 0 0 18px rgba(0,245,212,.6); }
+  .btn.ghost { background:#0c2a27; color:#7df3e6; box-shadow:0 0 14px rgba(0,245,212,.22); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
   .item { display:flex; gap:8px; padding:10px 12px; border-bottom:1px solid #1a1e26; cursor:pointer; align-items:flex-start; }
   .item:hover { background:#161a22; }
-  .item.active { background:#2a0a26; box-shadow: inset 3px 0 0 #00f5d4; }
+  .item.active { background:#06231f; box-shadow: inset 3px 0 0 #00f5d4, 0 0 18px rgba(0,245,212,.14); }
   .item .star { cursor:pointer; color:#5b6472; }
   .item .star.on { color:#ffc94d; }
   .item .main { min-width:0; flex:1; }
   .item .row1 { display:flex; gap:8px; align-items:center; }
   .item .s { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .item.unread .s::before { content:"●"; color:#00f5d4; margin-right:6px; font-size:10px; }
+  .item.unread .s::before { content:"●"; color:#00f5d4; margin-right:6px; font-size:10px; text-shadow:0 0 8px rgba(0,245,212,.8); }
   .item .sub { color:#9aa4b2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .item .meta { margin-left:auto; color:#6b7280; font-size:12px; white-space:nowrap; }
-  .badge { font-size:10px; padding:1px 6px; border-radius:6px; background:#2a0a26; color:#ff8be8; }
+  .badge { font-size:10px; padding:1px 6px; border-radius:6px; background:#06231f; color:#7df3e6; }
   .att { color:#c9a227; }
   .replied { color:#5fbf7f; font-size:11px; }
   .empty { color:#6b7280; padding:30px; text-align:center; }
@@ -356,6 +356,23 @@ export const MAIL_HTML = `<!doctype html>
   .note { color:#ffcf8e; font-size:12px; margin-top:14px; }
   input[type=checkbox]{ width:15px; height:15px; accent-color:#00f5d4; }
   .compose label { display:block; color:#7c8696; font-size:12px; margin:6px 2px 2px; }
+  .mail-back { display:none; }
+  @media (max-width: 820px) {
+    header { flex-wrap:wrap; row-gap:6px; }
+    .wrap { grid-template-columns: 1fr; height: calc(100vh - 45px); }
+    .col.side { border-right:0; border-bottom:1px solid #262b36; display:flex; gap:6px; align-items:center; overflow-x:auto; padding:8px; }
+    .col.side h4 { display:none; }
+    .col.side .search { width:150px; margin:0; flex:0 0 auto; }
+    .col.side .btn { width:auto; margin:0; flex:0 0 auto; }
+    .side .nav { white-space:nowrap; padding:6px 10px; }
+    .col.view { display:none; }
+    .wrap > div:nth-child(2) { display:flex; flex-direction:column; min-height:0; }
+    .wrap #list { height:auto !important; flex:1 1 auto; }
+    body.mail-open .col.side,
+    body.mail-open .wrap > div:nth-child(2) { display:none; }
+    body.mail-open .col.view { display:block; position:fixed; inset:45px 0 0 0; background:#0f1115; overflow:auto; z-index:40; padding:16px; border-right:0; }
+    .mail-back { display:inline-block; margin-bottom:12px; }
+  }
 </style>
 </head>
 <body>
@@ -481,6 +498,7 @@ async function loadMessages(){
 }
 async function open(id){
   S.openId = id;
+  document.body.classList.add('mail-open');
   const m = await api('/mail/api/messages/' + id);
   const v = document.getElementById('view');
   v.innerHTML = '';
@@ -506,6 +524,8 @@ async function open(id){
   if (S.folder !== 'sent') {
     msg.appendChild(el('div', { class:'chips' }, el('button', { class:'btn', onclick: () => reply(m) }, 'Ответить')));
   }
+  const backBtn = el('button', { class:'btn ghost mail-back', onclick: () => document.body.classList.remove('mail-open') }, '← Назад');
+  msg.prepend(backBtn);
   v.appendChild(msg);
   loadMessages();
 }
@@ -522,6 +542,7 @@ async function clearFolder(folder){
   if(!confirm('Очистить папку «' + name + '»? Это безвозвратно.')) return;
   await api('/mail/api/clear', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ folder }) });
   S.selected.clear(); S.openId=null;
+  document.body.classList.remove('mail-open');
   loadState(); loadMessages();
   document.getElementById('view').innerHTML = '<div class="empty">Выберите письмо слева.</div>';
 }

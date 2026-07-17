@@ -29,11 +29,12 @@
       --bg2: #0f0f16;
       --text: #f3f8f9;
       --text-dim: #7d8f93;
-      --accent: #1fd9e6;
-      --accent2: #ff4fa6;
+      --accent: #19e6f5;
+      --accent2: #ff7ac4;
       --card-bg: rgba(255, 255, 255, 0.05);
       --card-border: rgba(255, 255, 255, 0.10);
-      --glow: rgba(31, 217, 230, 0.35);
+      --glow: rgba(25, 230, 245, 0.55);
+      --glow-soft: rgba(25, 230, 245, 0.22);
     }
 
     * {
@@ -86,7 +87,7 @@
       background: var(--accent);
       top: -200px;
       left: -100px;
-      opacity: 0.15;
+      opacity: 0.30;
     }
 
     .bg-gradient__orb--2 {
@@ -95,7 +96,7 @@
       background: var(--accent2);
       bottom: -200px;
       right: -100px;
-      opacity: 0.12;
+      opacity: 0.05;
     }
 
     .bg-gradient__orb--3 {
@@ -104,7 +105,7 @@
       background: var(--accent);
       top: 40%;
       left: 50%;
-      opacity: 0.08;
+      opacity: 0.18;
     }
 
     .content {
@@ -136,8 +137,8 @@
       border-radius: 50%;
       margin: 0 auto 24px;
       background: #0f0f16;
-      border: 3px solid var(--accent2);
-      box-shadow: 0 0 40px var(--glow), 0 0 80px rgba(0, 0, 0, 0.8);
+      border: 3px solid var(--accent);
+      box-shadow: 0 0 40px var(--glow), 0 0 80px var(--glow-soft);
       overflow: hidden;
       display: flex;
       align-items: center;
@@ -150,7 +151,7 @@
     }
 
     .hero__avatar:hover {
-      box-shadow: 0 0 60px var(--glow);
+      box-shadow: 0 0 60px var(--glow), 0 0 90px var(--glow-soft);
     }
 
     .hero__name {
@@ -160,13 +161,13 @@
       letter-spacing: -1px;
       margin-bottom: 8px;
       color: var(--accent);
-      text-shadow: 0 0 20px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 0, 0, 0.7);
+      text-shadow: 0 0 18px var(--glow), 0 0 36px var(--glow-soft), 0 0 40px rgba(0, 0, 0, 0.7);
     }
 
     .hero__subtitle {
       font-size: 15px;
-      color: var(--accent2);
-      text-shadow: 0 0 28px rgba(90, 190, 190, 0.7), 0 0 25px rgba(10, 10, 10, 0.5);
+      color: #8df2fb;
+      text-shadow: 0 0 18px var(--glow-soft), 0 0 25px rgba(10, 10, 10, 0.5);
       font-weight: 500;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -188,7 +189,7 @@
       margin-bottom: 24px;
       padding-left: 16px;
       border-left: 3px solid var(--accent);
-      text-shadow: 0 0 20px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 0, 0, 0.7);
+      text-shadow: 0 0 16px var(--glow-soft), 0 0 40px rgba(0, 0, 0, 0.7);
     }
 
     .gallery {
@@ -527,7 +528,7 @@
       border-radius: 50%;
       border: 2px solid var(--card-border);
       background: var(--card-bg);
-      color: var(--accent2);
+      color: var(--accent);
       font-size: 22px;
       cursor: pointer;
       display: flex;
@@ -543,7 +544,7 @@
 
     .miku-egg:hover {
       transform: scale(1.12);
-      border-color: var(--accent2);
+      border-color: var(--accent);
     }
 
     @keyframes eggPulse {
