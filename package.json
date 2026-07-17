@@ -6,6 +6,7 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
+    "@simplewebauthn/server": "^13.3.2",
     "nodemailer": "^6.10.1",
     "postal-mime": "^2.4.1"
   }

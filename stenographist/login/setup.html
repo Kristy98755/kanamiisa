@@ -164,6 +164,12 @@
                     <div class="section-title">Готово</div>
                     <a href="/login" class="btn btn-secondary" style="text-decoration: none; text-align: center; display: block;">Вернуться ко входу</a>
                 </div>
+
+                <div style="margin-top: 24px;">
+                    <div class="section-title">Биометрия (Passkey / Windows Hello)</div>
+                    <button type="button" class="btn btn-primary" id="webauthn-btn">Зарегистрировать биометрию</button>
+                    <p id="webauthn-status" style="font-size: 12px; color: #888; margin-top: 12px;"></p>
+                </div>
             </div>
 
             <a href="/login" class="back-link">← Вернуться ко входу</a>
@@ -299,6 +305,84 @@
         function showSuccess(message) {
             // Could add a success message element if needed
             console.log(message);
+        }
+
+        function b64urlToBuf(b64url) {
+            const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+            const pad = b64.length % 4 ? '='.repeat(4 - (b64.length % 4)) : '';
+            const bin = atob(b64 + pad);
+            const buf = new ArrayBuffer(bin.length);
+            const view = new Uint8Array(buf);
+            for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i);
+            return buf;
+        }
+
+        function bufToB64url(buf) {
+            const bytes = new Uint8Array(buf);
+            let s = '';
+            for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+            return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        if (!window.PublicKeyCredential) {
+            const wb = document.getElementById('webauthn-btn');
+            wb.style.display = 'none';
+            document.getElementById('webauthn-status').textContent = 'Браузер не поддерживает биометрию.';
+        } else {
+            document.getElementById('webauthn-btn').addEventListener('click', async () => {
+                hideError();
+                const pin = prompt('Введите код доступа (PIN) для регистрации биометрии:');
+                if (!pin) return;
+                const btn = document.getElementById('webauthn-btn');
+                const status = document.getElementById('webauthn-status');
+                btn.disabled = true;
+                status.textContent = 'Ожидание биометрии...';
+                try {
+                    const beginRes = await fetch('/login/api/setup/webauthn/begin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ pin })
+                    });
+                    const beginData = await beginRes.json();
+                    if (!beginRes.ok) throw new Error(beginData.error || 'Ошибка запуска');
+
+                    const opts = beginData.options;
+                    opts.challenge = b64urlToBuf(opts.challenge);
+                    if (opts.excludeCredentials) {
+                        opts.excludeCredentials = opts.excludeCredentials.map((c) => ({ ...c, id: b64urlToBuf(c.id) }));
+                    }
+
+                    const cred = await navigator.credentials.create({ publicKey: opts });
+
+                    const response = {
+                        id: cred.id,
+                        rawId: bufToB64url(cred.rawId),
+                        type: cred.type,
+                        response: {
+                            clientDataJSON: bufToB64url(cred.response.clientDataJSON),
+                            attestationObject: bufToB64url(cred.response.attestationObject),
+                            transports: cred.response.getTransports ? cred.response.getTransports() : []
+                        }
+                    };
+
+                    const finishRes = await fetch('/login/api/setup/webauthn/finish', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ flowToken: beginData.flowToken, response })
+                    });
+                    const finishData = await finishRes.json();
+                    if (!finishRes.ok) throw new Error(finishData.error || 'Регистрация не удалась');
+
+                    status.textContent = '✅ Биометрия зарегистрирована. Теперь можно входить по ней.';
+                    status.style.color = '#4CAF50';
+                } catch (err) {
+                    status.textContent = err.message || 'Ошибка регистрации';
+                    status.style.color = '#ff6b6b';
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Зарегистрировать биометрию';
+                }
+            });
         }
 
         // Initialize on page load

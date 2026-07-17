@@ -10,6 +10,10 @@ import {
     saveLog, listLogs, saveTOTPSecret, getTOTPSecret, validateSetupAuth
 } from './auth.js';
 import { mailFetch, mailEmail } from './mail.js';
+import {
+    webauthnSetupBegin, webauthnSetupFinish,
+    webauthnLoginBegin, webauthnLoginFinish
+} from './webauthn.js';
 
 export default {
     async fetch(request, env) {
@@ -35,6 +39,10 @@ export default {
             if (lsub === 'api/logout' && request.method === 'POST') return handleLogout(request, env);
             if (lsub === 'api/setup' && request.method === 'POST') return handleSetup(request, env);
             if (lsub === 'api/secret' && request.method === 'POST') return handleGetSecret(request, env);
+            if (lsub === 'api/setup/webauthn/begin' && request.method === 'POST') return handleWebauthnSetupBegin(request, env);
+            if (lsub === 'api/setup/webauthn/finish' && request.method === 'POST') return handleWebauthnSetupFinish(request, env);
+            if (lsub === 'api/webauthn/begin' && request.method === 'POST') return handleWebauthnLoginBegin(request, env);
+            if (lsub === 'api/webauthn/finish' && request.method === 'POST') return handleWebauthnLoginFinish(request, env);
         }
 
         // === Stenographist routes ===
@@ -68,6 +76,18 @@ export default {
             }
             if (subpath === 'login/api/secret' && request.method === 'POST') {
                 return handleGetSecret(request, env);
+            }
+            if (subpath === 'login/api/setup/webauthn/begin' && request.method === 'POST') {
+                return handleWebauthnSetupBegin(request, env);
+            }
+            if (subpath === 'login/api/setup/webauthn/finish' && request.method === 'POST') {
+                return handleWebauthnSetupFinish(request, env);
+            }
+            if (subpath === 'login/api/webauthn/begin' && request.method === 'POST') {
+                return handleWebauthnLoginBegin(request, env);
+            }
+            if (subpath === 'login/api/webauthn/finish' && request.method === 'POST') {
+                return handleWebauthnLoginFinish(request, env);
             }
 
             // --- Session tracking (no auth, uses session_id cookie) ---
@@ -559,6 +579,89 @@ async function handleGetSecret(request, env) {
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uri)}`;
 
         return jsonResponse({ secret, uri, qr_url: qrUrl });
+    } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+// ============================================================
+// WebAuthn (Passkeys) — biometric / Windows Hello login
+// ============================================================
+
+async function handleWebauthnSetupBegin(request, env) {
+    try {
+        const { pin } = await request.json().catch(() => ({}));
+        const result = await webauthnSetupBegin(env, request, pin);
+        if (result.error) return jsonResponse({ error: result.error }, result.status || 400);
+        return jsonResponse(result);
+    } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+async function handleWebauthnSetupFinish(request, env) {
+    try {
+        const { flowToken, response } = await request.json().catch(() => ({}));
+        const result = await webauthnSetupFinish(env, request, flowToken, response);
+        if (result.error) return jsonResponse({ error: result.error }, result.status || 400);
+        return jsonResponse(result);
+    } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+async function handleWebauthnLoginBegin(request, env) {
+    try {
+        const result = await webauthnLoginBegin(env, request);
+        if (result.error) return jsonResponse({ error: result.error }, result.status || 400);
+        return jsonResponse(result);
+    } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+async function handleWebauthnLoginFinish(request, env) {
+    try {
+        const { flowToken, response } = await request.json().catch(() => ({}));
+        const result = await webauthnLoginFinish(env, request, flowToken, response);
+        if (result.error) return jsonResponse({ error: result.error }, result.status || 400);
+
+        const username = 'kanamiisa';
+        const authFrom = new URL(request.url).searchParams.get('from');
+        const sessionId = await createSession(env, username, true);
+
+        let stenoSessionId = getSessionId(request);
+        if (!stenoSessionId) stenoSessionId = crypto.randomUUID();
+
+        const now = new Date().toISOString();
+        await env.AUTH_KV.put(`session:${stenoSessionId}`, JSON.stringify({
+            id: stenoSessionId,
+            created: now,
+            lastSeen: now,
+            ip: request.headers.get('CF-Connecting-IP') || 'unknown',
+            country: request.headers.get('CF-IPCountry') || 'unknown',
+            userAgent: request.headers.get('User-Agent') || 'unknown',
+            username,
+            role: 'root',
+            failedAttempts: 0,
+            events: []
+        }), { expirationTtl: 3600 });
+
+        const listKey = `session_list:${username}`;
+        const list = await env.AUTH_KV.get(listKey, 'json') || [];
+        if (!list.includes(stenoSessionId)) {
+            list.push(stenoSessionId);
+            await env.AUTH_KV.put(listKey, JSON.stringify(list), { expirationTtl: 3600 });
+        }
+
+        const headers = new Headers({ 'Content-Type': 'application/json' });
+        headers.append('Set-Cookie', `session=${sessionId}; Path=/; HttpOnly; SameSite=Strict`);
+        headers.append('Set-Cookie', `session_id=${stenoSessionId}; Path=/stenographist; SameSite=Strict; Max-Age=3600`);
+
+        return new Response(JSON.stringify({ success: true, is_root: true, from: authFrom }), {
+            status: 200,
+            headers
+        });
     } catch (err) {
         return jsonResponse({ error: err.message }, 500);
     }

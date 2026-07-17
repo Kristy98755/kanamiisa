@@ -100,6 +100,41 @@
         .error-message.visible {
             display: block;
         }
+        .biometric-btn {
+            width: 100%;
+            padding: 14px;
+            background: #2196F3;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 12px;
+        }
+        .biometric-btn:hover {
+            background: #1976D2;
+        }
+        .biometric-btn:disabled {
+            background: #333;
+            cursor: not-allowed;
+        }
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 20px 0 4px;
+            color: #555;
+            font-size: 12px;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #333;
+        }
+        .divider:not(:empty)::before { margin-right: 12px; }
+        .divider:not(:empty)::after { margin-left: 12px; }
     </style>
 </head>
 <body>
@@ -123,6 +158,10 @@
                 </div>
                 <button type="submit" class="submit-btn" id="login-btn">Войти</button>
             </form>
+
+            <div class="divider">или</div>
+
+            <button type="button" class="biometric-btn" id="biometric-btn">🔐 Войти по биометрии</button>
         </div>
     </div>
 
@@ -282,6 +321,77 @@
         });
 
         document.getElementById('username').focus();
+
+        // === WebAuthn biometric login ===
+        function b64urlToBuf(b64url) {
+            const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+            const pad = b64.length % 4 ? '='.repeat(4 - (b64.length % 4)) : '';
+            const bin = atob(b64 + pad);
+            const buf = new ArrayBuffer(bin.length);
+            const view = new Uint8Array(buf);
+            for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i);
+            return buf;
+        }
+
+        function bufToB64url(buf) {
+            const bytes = new Uint8Array(buf);
+            let s = '';
+            for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+            return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        if (!window.PublicKeyCredential) {
+            document.getElementById('biometric-btn').style.display = 'none';
+        } else {
+            document.getElementById('biometric-btn').addEventListener('click', async () => {
+                hideError();
+                const btn = document.getElementById('biometric-btn');
+                btn.disabled = true;
+                btn.textContent = 'Ожидание биометрии...';
+                try {
+                    const beginRes = await fetch('/login/api/webauthn/begin', { method: 'POST' });
+                    const beginData = await beginRes.json();
+                    if (!beginRes.ok) throw new Error(beginData.error || 'Ошибка запуска');
+
+                    const opts = beginData.options;
+                    opts.challenge = b64urlToBuf(opts.challenge);
+                    if (opts.allowCredentials) {
+                        opts.allowCredentials = opts.allowCredentials.map((c) => ({ ...c, id: b64urlToBuf(c.id) }));
+                    }
+
+                    const cred = await navigator.credentials.get({ publicKey: opts });
+
+                    const response = {
+                        id: cred.id,
+                        rawId: bufToB64url(cred.rawId),
+                        type: cred.type,
+                        response: {
+                            authenticatorAttachment: cred.response.authenticatorAttachment,
+                            clientDataJSON: bufToB64url(cred.response.clientDataJSON),
+                            authenticatorData: bufToB64url(cred.response.authenticatorData),
+                            signature: bufToB64url(cred.response.signature),
+                            userHandle: cred.response.userHandle ? bufToB64url(cred.response.userHandle) : null
+                        }
+                    };
+
+                    const finishRes = await fetch('/login/api/webauthn/finish?from=' + encodeURIComponent(LOGIN_FROM), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ flowToken: beginData.flowToken, response })
+                    });
+                    const finishData = await finishRes.json();
+                    if (!finishRes.ok) throw new Error(finishData.error || 'Вход не удался');
+
+                    sessionStorage.setItem('is_root', true);
+                    sessionStorage.setItem('username', 'kanamiisa');
+                    window.location.href = LOGIN_REDIRECTS[LOGIN_FROM] || LOGIN_REDIRECTS.stenographist;
+                } catch (err) {
+                    showError(err.message || 'Вход по биометрии не удался');
+                    btn.disabled = false;
+                    btn.textContent = '🔐 Войти по биометрии';
+                }
+            });
+        }
     </script>
 </body>
 </html>
