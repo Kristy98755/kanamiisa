@@ -62,12 +62,20 @@
     startHeartbeat();
   }
 
+  function targetFrom() {
+    var p = location.pathname;
+    if (p.indexOf('/mail') === 0) return 'mail';
+    if (p.indexOf('/stenographist/panel') === 0) return 'panel';
+    if (p.indexOf('/stenographist') === 0) return 'stenographist';
+    return 'stenographist';
+  }
+
   async function logout() {
     try {
       await fetch('/login/api/logout', { method: 'POST', keepalive: true });
     } catch (e) {}
     try { sessionStorage.clear(); } catch (e) {}
-    window.location.href = '/login';
+    window.location.href = '/login?from=' + encodeURIComponent(targetFrom());
   }
 
   function startHeartbeat() {
@@ -92,9 +100,6 @@
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) onHidden();
       else onVisible();
-    });
-    window.addEventListener('beforeunload', function () {
-      try { navigator.sendBeacon('/login/api/logout'); } catch (e) {}
     });
     startHeartbeat();
   }

@@ -5,7 +5,6 @@
  */
 
 import { validateSession } from './auth.js';
-import { sendNewMailPush } from './push.js';
 import PostalMime from 'postal-mime';
 import nodemailer from 'nodemailer';
 
@@ -141,6 +140,11 @@ export async function handleMailApi(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
 
+  if (path === "/mail/api/test-telegram" && request.method === "GET") {
+    await notifyTelegram(env, { address: "test@example.com", isReply: false, subject: "Тест уведомления" });
+    return json({ ok: true });
+  }
+
   if (path === "/mail/api/state" && request.method === "GET") return json(await getState(env));
 
   if (path === "/mail/api/send" && request.method === "POST") return handleMailSend(request, env);
@@ -220,6 +224,23 @@ export async function mailFetch(request, env) {
   return new Response("Not found", { status: 404 });
 }
 
+async function notifyTelegram(env, { address, isReply, subject }) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return;
+  const who = address || 'неизвестного';
+  let text = (isReply ? 'Новое письмо (Re) от ' : 'Новое письмо от ') + who;
+  if (subject) text += '\n«' + subject + '»';
+  const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true }),
+    });
+  } catch (e) {
+    console.error('[mail] telegram notify failed', e);
+  }
+}
+
 // Inbound email path — real handler driven by Cloudflare Email Routing.
 export async function mailEmail(message, env, ctx) {
   ctx.waitUntil((async () => {
@@ -257,14 +278,15 @@ export async function mailEmail(message, env, ctx) {
       ).run();
        console.log(`[mail] stored inbound ${message.from} -> ${message.to}: ${email.subject}`);
 
-       try {
-         await sendNewMailPush(env, {
-           address: email.from?.address || message.from,
-           isReply: /^\s*re:/i.test(email.subject || ''),
-         });
-       } catch (pe) {
-         console.error('[mail] push failed', pe);
-       }
+        try {
+          await notifyTelegram(env, {
+            address: email.from?.address || message.from,
+            isReply: /^\s*re:/i.test(email.subject || ''),
+            subject: email.subject || '',
+          });
+        } catch (te) {
+          console.error('[mail] telegram failed', te);
+        }
     } catch (e) {
       console.error("[mail] parse failed", e);
       try {
@@ -340,11 +362,11 @@ export const MAIL_HTML = `<!doctype html>
 <header>
   <b>kanamiisa mail</b><span class="pill">support@kanamiisa.uk</span>
   <span style="flex:1"></span>
-  <a class="navlink" href="/stenographist/panel.html">Панель</a>
-  <a class="navlink" href="/stenographist/index.html">Стенографист</a>
-  <button class="btn ghost" id="logout">Выйти</button>
-  <span id="pushControls" style="display:flex;gap:6px;align-items:center;"></span>
-  <span id="stat" style="color:#7c8696; font-size:12px;"></span>
+   <a class="navlink" href="/stenographist/panel.html">Панель</a>
+   <a class="navlink" href="/stenographist/index.html">Стенографист</a>
+   <button class="btn ghost" id="tgtest">📨 Тест Telegram</button>
+   <button class="btn ghost" id="logout">Выйти</button>
+   <span id="stat" style="color:#7c8696; font-size:12px;"></span>
 </header>
 <div class="wrap">
   <div class="col side" id="side"></div>
@@ -554,7 +576,18 @@ document.querySelectorAll('.toolbar [data-act]').forEach(b => b.addEventListener
 document.getElementById('refresh').addEventListener('click', () => { loadState(); loadMessages(); });
 document.getElementById('logout').addEventListener('click', async () => {
   await fetch('/login/api/logout', { method: 'POST' }).catch(() => {});
-  location.href = '/login';
+  location.href = '/login?from=mail';
+});
+document.getElementById('tgtest').addEventListener('click', async () => {
+  const b = document.getElementById('tgtest');
+  const old = b.textContent;
+  try {
+    await fetch('/mail/api/test-telegram');
+    b.textContent = 'Отправлено!';
+  } catch (e) {
+    b.textContent = 'Ошибка';
+  }
+  setTimeout(() => (b.textContent = old), 2000);
 });
 document.getElementById('compose-btn').addEventListener('click', () => compose());
 document.getElementById('c-close').addEventListener('click', closeCompose);
@@ -565,6 +598,5 @@ loadState();
 loadMessages();
 </script>
 <script src="/js/auto-logout.js"></script>
-<script src="/push-client.js"></script>
 </body>
 </html>`;
