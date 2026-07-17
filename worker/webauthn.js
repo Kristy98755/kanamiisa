@@ -82,14 +82,33 @@ export async function webauthnSetupFinish(env, request, flowToken, response) {
   }
   const ri = verification.registrationInfo;
   const creds = await getCredentials(env);
+  const name = 'Устройство-' + crypto.randomUUID().slice(0, 8);
   creds.push({
     id: ri.credential.id,
+    name,
     publicKey: bytesToB64url(ri.credential.publicKey),
     counter: ri.credential.counter,
     transports: (response && response.transports) || [],
   });
   await env.AUTH_KV.put('webauthn:creds', JSON.stringify(creds));
   await env.AUTH_KV.delete(`webauthn:challenge:${flowToken}`);
+  return { ok: true, name };
+}
+
+export async function webauthnList(env, pin) {
+  if (pin !== SETUP_PIN) return { error: 'Неверный код доступа', status: 403 };
+  const creds = await getCredentials(env);
+  return {
+    credentials: creds.map((c) => ({ id: c.id, name: c.name || c.id.slice(0, 12) })),
+  };
+}
+
+export async function webauthnDelete(env, pin, id) {
+  if (pin !== SETUP_PIN) return { error: 'Неверный код доступа', status: 403 };
+  const creds = await getCredentials(env);
+  const filtered = creds.filter((c) => c.id !== id);
+  if (filtered.length === creds.length) return { error: 'Ключ не найден', status: 404 };
+  await env.AUTH_KV.put('webauthn:creds', JSON.stringify(filtered));
   return { ok: true };
 }
 

@@ -146,6 +146,43 @@
             outline: none;
             border-color: #4CAF50;
         }
+        .wa-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .wa-name {
+            font-size: 14px;
+            color: #e0e0e0;
+            word-break: break-all;
+            margin-right: 12px;
+        }
+        .wa-del {
+            flex-shrink: 0;
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 6px;
+            background: #3a1a1a;
+            color: #ff6b6b;
+            font-size: 16px;
+            line-height: 1;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .wa-del:hover {
+            background: #5a2a2a;
+        }
+        .wa-empty {
+            font-size: 13px;
+            color: #666;
+            margin-top: 12px;
+        }
     </style>
 </head>
 <body>
@@ -193,6 +230,7 @@
                     <div class="section-title">Биометрия (Passkey / Windows Hello)</div>
                     <button type="button" class="btn btn-primary" id="webauthn-btn">Зарегистрировать биометрию</button>
                     <p id="webauthn-status" style="font-size: 12px; color: #888; margin-top: 12px;"></p>
+                    <div id="webauthn-list" style="margin-top: 16px;"></div>
                 </div>
 
                 <div style="margin-top: 24px;">
@@ -243,6 +281,7 @@
             unlockedCode = code;
             document.getElementById('lock').classList.add('hidden');
             document.getElementById('setup-panel').classList.remove('hidden');
+            loadWebauthnList();
         }
 
         document.getElementById('unlock-btn').addEventListener('click', unlock);
@@ -302,8 +341,7 @@
             }
         });
 
-        function b64urlToBuf(b64url) {
-            const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+        function b64urlToBuf(b64url) {            const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
             const pad = b64.length % 4 ? '='.repeat(4 - (b64.length % 4)) : '';
             const bin = atob(b64 + pad);
             const buf = new ArrayBuffer(bin.length);
@@ -317,6 +355,76 @@
             let s = '';
             for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
             return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        async function loadWebauthnList() {
+            const listEl = document.getElementById('webauthn-list');
+            if (!listEl || !unlockedCode) return;
+            listEl.innerHTML = '<p class="wa-empty">Загрузка...</p>';
+            try {
+                const res = await fetch('/login/api/setup/webauthn/list', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: unlockedCode })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    listEl.innerHTML = '<p class="wa-empty">' + (data.error || 'Ошибка') + '</p>';
+                    return;
+                }
+                if (!data.credentials || !data.credentials.length) {
+                    listEl.innerHTML = '<p class="wa-empty">Пока нет зарегистрированных устройств.</p>';
+                    return;
+                }
+                listEl.innerHTML = '';
+                data.credentials.forEach((c) => {
+                    const item = document.createElement('div');
+                    item.className = 'wa-item';
+
+                    const name = document.createElement('span');
+                    name.className = 'wa-name';
+                    name.textContent = c.name;
+
+                    const del = document.createElement('button');
+                    del.className = 'wa-del';
+                    del.textContent = '✕';
+                    del.title = 'Удалить устройство';
+                    del.addEventListener('click', () => deleteWebauthn(c.id, item));
+
+                    item.appendChild(name);
+                    item.appendChild(del);
+                    listEl.appendChild(item);
+                });
+            } catch (err) {
+                listEl.innerHTML = '<p class="wa-empty">Ошибка загрузки списка</p>';
+            }
+        }
+
+        async function deleteWebauthn(id, itemEl) {
+            if (!unlockedCode) return;
+            itemEl.style.opacity = '0.5';
+            try {
+                const res = await fetch('/login/api/setup/webauthn/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: unlockedCode, id })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    itemEl.style.opacity = '1';
+                    const status = document.getElementById('webauthn-status');
+                    status.textContent = data.error || 'Не удалось удалить';
+                    status.style.color = '#ff6b6b';
+                    return;
+                }
+                itemEl.remove();
+                const listEl = document.getElementById('webauthn-list');
+                if (!listEl.children.length) {
+                    listEl.innerHTML = '<p class="wa-empty">Пока нет зарегистрированных устройств.</p>';
+                }
+            } catch (err) {
+                itemEl.style.opacity = '1';
+            }
         }
 
         if (!window.PublicKeyCredential) {
@@ -370,6 +478,7 @@
 
                     status.textContent = '✅ Биометрия зарегистрирована. Теперь можно входить по ней.';
                     status.style.color = '#4CAF50';
+                    loadWebauthnList();
                 } catch (err) {
                     status.textContent = err.message || 'Ошибка регистрации';
                     status.style.color = '#ff6b6b';

@@ -12,7 +12,8 @@ import {
 import { mailFetch, mailEmail } from './mail.js';
 import {
     webauthnSetupBegin, webauthnSetupFinish,
-    webauthnLoginBegin, webauthnLoginFinish
+    webauthnLoginBegin, webauthnLoginFinish,
+    webauthnList, webauthnDelete
 } from './webauthn.js';
 
 export default {
@@ -41,6 +42,8 @@ export default {
             if (lsub === 'api/secret' && request.method === 'POST') return handleGetSecret(request, env);
             if (lsub === 'api/setup/webauthn/begin' && request.method === 'POST') return handleWebauthnSetupBegin(request, env);
             if (lsub === 'api/setup/webauthn/finish' && request.method === 'POST') return handleWebauthnSetupFinish(request, env);
+            if (lsub === 'api/setup/webauthn/list' && request.method === 'POST') return handleWebauthnList(request, env);
+            if (lsub === 'api/setup/webauthn/delete' && request.method === 'POST') return handleWebauthnDelete(request, env);
             if (lsub === 'api/webauthn/begin' && request.method === 'POST') return handleWebauthnLoginBegin(request, env);
             if (lsub === 'api/webauthn/finish' && request.method === 'POST') return handleWebauthnLoginFinish(request, env);
         }
@@ -82,6 +85,12 @@ export default {
             }
             if (subpath === 'login/api/setup/webauthn/finish' && request.method === 'POST') {
                 return handleWebauthnSetupFinish(request, env);
+            }
+            if (subpath === 'login/api/setup/webauthn/list' && request.method === 'POST') {
+                return handleWebauthnList(request, env);
+            }
+            if (subpath === 'login/api/setup/webauthn/delete' && request.method === 'POST') {
+                return handleWebauthnDelete(request, env);
             }
             if (subpath === 'login/api/webauthn/begin' && request.method === 'POST') {
                 return handleWebauthnLoginBegin(request, env);
@@ -603,6 +612,28 @@ async function handleWebauthnSetupFinish(request, env) {
     try {
         const { flowToken, response } = await request.json().catch(() => ({}));
         const result = await webauthnSetupFinish(env, request, flowToken, response);
+        if (result.error) return jsonResponse({ error: result.error }, result.status || 400);
+        return jsonResponse(result);
+    } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+async function handleWebauthnList(request, env) {
+    try {
+        const { pin } = await request.json().catch(() => ({}));
+        const result = await webauthnList(env, pin);
+        if (result.error) return jsonResponse({ error: result.error }, result.status || 400);
+        return jsonResponse(result);
+    } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+    }
+}
+
+async function handleWebauthnDelete(request, env) {
+    try {
+        const { pin, id } = await request.json().catch(() => ({}));
+        const result = await webauthnDelete(env, pin, id);
         if (result.error) return jsonResponse({ error: result.error }, result.status || 400);
         return jsonResponse(result);
     } catch (err) {
