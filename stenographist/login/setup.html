@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kanamiisa — Настройка TOTP</title>
+    <title>Kanamiisa — Настройка</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -121,26 +121,55 @@
             padding-bottom: 8px;
             border-bottom: 1px solid #333;
         }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
     </style>
 </head>
 <body>
     <div class="setup-container">
         <div class="setup-card">
             <div class="setup-header">
-                <h1>Настройка TOTP</h1>
-                <p>Генерация секрета для Google Authenticator</p>
+                <h1>Настройка</h1>
+                <p>Введите код доступа</p>
             </div>
 
             <div id="error" class="error-message"></div>
 
-            <!-- Waiting for cheat code -->
-            <div id="waiting" class="hidden">
-                <p style="text-align: center; color: #888;">Запрос кода доступа...</p>
+            <!-- Lock screen -->
+            <div id="lock">
+                <div class="form-group">
+                    <label>Код доступа</label>
+                    <input type="password" id="access-code" placeholder="••••••" inputmode="numeric" autocomplete="off">
+                </div>
+                <button type="button" class="btn btn-primary" id="unlock-btn">Разблокировать</button>
             </div>
 
-            <!-- Setup panel (hidden until authenticated) -->
+            <!-- Setup panel (hidden until unlocked) -->
             <div id="setup-panel" class="hidden">
-                <div class="section-title">Новый секрет</div>
+                <div class="section-title">Новый TOTP-секрет</div>
                 <button type="button" class="btn btn-primary" id="generate-btn">Сгенерировать новый секрет</button>
 
                 <div id="qr-container" class="qr-container hidden">
@@ -161,14 +190,14 @@
                 </div>
 
                 <div style="margin-top: 24px;">
-                    <div class="section-title">Готово</div>
-                    <a href="/login" class="btn btn-secondary" style="text-decoration: none; text-align: center; display: block;">Вернуться ко входу</a>
-                </div>
-
-                <div style="margin-top: 24px;">
                     <div class="section-title">Биометрия (Passkey / Windows Hello)</div>
                     <button type="button" class="btn btn-primary" id="webauthn-btn">Зарегистрировать биометрию</button>
                     <p id="webauthn-status" style="font-size: 12px; color: #888; margin-top: 12px;"></p>
+                </div>
+
+                <div style="margin-top: 24px;">
+                    <div class="section-title">Готово</div>
+                    <a href="/login" class="btn btn-secondary" style="text-decoration: none; text-align: center; display: block;">Вернуться ко входу</a>
                 </div>
             </div>
 
@@ -178,6 +207,8 @@
 
     <script src="/qrcode.js"></script>
     <script>
+        let unlockedCode = null;
+
         function showError(message) {
             const el = document.getElementById('error');
             el.textContent = message;
@@ -188,69 +219,48 @@
             document.getElementById('error').classList.remove('visible');
         }
 
-        async function verifyCheatCode(code) {
-            try {
-                const res = await fetch('/login/api/setup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code })
-                });
-
-                if (res.ok) {
-                    return true;
-                }
-                return false;
-            } catch (err) {
-                return false;
-            }
+        async function verifyCode(code) {
+            const res = await fetch('/login/api/setup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+            });
+            return res.ok;
         }
 
-        async function init() {
-            // Show prompt for cheat code
-            const code = prompt('Введите код доступа:');
-            
-            if (code === null) {
-                // User cancelled
-                window.location.href = '/login';
+        async function unlock() {
+            hideError();
+            const code = document.getElementById('access-code').value.trim();
+            if (!code) {
+                showError('Введите код доступа');
                 return;
             }
-
-            if (code === '') {
-                showError('Код не может быть пустым');
-                return;
-            }
-
-            const valid = await verifyCheatCode(code);
-            
+            const valid = await verifyCode(code);
             if (!valid) {
                 showError('Неверный код доступа');
                 return;
             }
-
-            // Show setup panel
-            document.getElementById('waiting').classList.add('hidden');
+            unlockedCode = code;
+            document.getElementById('lock').classList.add('hidden');
             document.getElementById('setup-panel').classList.remove('hidden');
         }
 
+        document.getElementById('unlock-btn').addEventListener('click', unlock);
+        document.getElementById('access-code').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') unlock();
+        });
+
         document.getElementById('generate-btn').addEventListener('click', async () => {
             hideError();
-
+            if (!unlockedCode) return;
             try {
-                const code = prompt('Введите код доступа:');
-                if (!code) return;
-
                 const res = await fetch('/login/api/setup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code })
+                    body: JSON.stringify({ code: unlockedCode })
                 });
-
                 const data = await res.json();
-
-                if (!res.ok) {
-                    showError(data.error || 'Ошибка');
-                    return;
-                }
+                if (!res.ok) { showError(data.error || 'Ошибка'); return; }
 
                 const qr = qrcode(0, 'M');
                 qr.addData(data.uri);
@@ -259,8 +269,6 @@
                 document.getElementById('qr-image').src = svgData;
                 document.getElementById('secret-display').textContent = data.secret;
                 document.getElementById('qr-container').classList.remove('hidden');
-
-                showSuccess('Новый секрет сгенерирован. Отсканируйте QR-код.');
             } catch (err) {
                 showError('Ошибка сети');
             }
@@ -268,23 +276,15 @@
 
         document.getElementById('show-current-btn').addEventListener('click', async () => {
             hideError();
-
+            if (!unlockedCode) return;
             try {
-                const code = prompt('Введите код доступа:');
-                if (!code) return;
-
                 const res = await fetch('/login/api/secret', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code })
+                    body: JSON.stringify({ code: unlockedCode })
                 });
-
                 const data = await res.json();
-
-                if (!res.ok) {
-                    showError(data.error || 'Ошибка');
-                    return;
-                }
+                if (!res.ok) { showError(data.error || 'Ошибка'); return; }
 
                 if (data.uri) {
                     const qr = qrcode(0, 'M');
@@ -301,11 +301,6 @@
                 showError('Ошибка сети');
             }
         });
-
-        function showSuccess(message) {
-            // Could add a success message element if needed
-            console.log(message);
-        }
 
         function b64urlToBuf(b64url) {
             const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
@@ -331,8 +326,7 @@
         } else {
             document.getElementById('webauthn-btn').addEventListener('click', async () => {
                 hideError();
-                const pin = prompt('Введите код доступа (PIN) для регистрации биометрии:');
-                if (!pin) return;
+                if (!unlockedCode) return;
                 const btn = document.getElementById('webauthn-btn');
                 const status = document.getElementById('webauthn-status');
                 btn.disabled = true;
@@ -341,7 +335,7 @@
                     const beginRes = await fetch('/login/api/setup/webauthn/begin', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ pin })
+                        body: JSON.stringify({ pin: unlockedCode })
                     });
                     const beginData = await beginRes.json();
                     if (!beginRes.ok) throw new Error(beginData.error || 'Ошибка запуска');
@@ -384,9 +378,6 @@
                 }
             });
         }
-
-        // Initialize on page load
-        init();
     </script>
 </body>
 </html>
