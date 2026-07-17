@@ -46,10 +46,14 @@
 
   async function ensureSw() {
     if (!('serviceWorker' in navigator)) return null;
-    return navigator.serviceWorker.register('/sw.js').catch((e) => {
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await reg.update();
+      return reg;
+    } catch (e) {
       console.warn('sw registration failed', e);
       return null;
-    });
+    }
   }
 
   async function subscribe() {

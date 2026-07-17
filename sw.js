@@ -1,4 +1,12 @@
 /* Kanami-isa mail service — push service worker */
+self.addEventListener('install', function () {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function (event) {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', function (event) {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { return; }
