@@ -10,6 +10,7 @@ import {
     saveLog, listLogs, saveTOTPSecret, getTOTPSecret, validateSetupAuth
 } from './auth.js';
 import { mailFetch, mailEmail } from './mail.js';
+import { getVapidPublic, storeSubscription, removeSubscription, sendPushToAll } from './push.js';
 
 export default {
     async fetch(request, env) {
@@ -136,6 +137,28 @@ export default {
         // === Mail routes (auth-gated via session system) ===
         if (path === '/mail' || path === '/mail/' || path.startsWith('/mail/api/')) {
             return mailFetch(request, env);
+        }
+
+        // === Web Push routes ===
+        if (path === '/push/vapid' && request.method === 'GET') {
+            return jsonResponse({ publicKey: getVapidPublic(env) });
+        }
+        if ((path === '/push/subscribe' || path === '/push/unsubscribe' || path === '/push/test') && request.method === 'POST') {
+            const session = await validateSession(request, env);
+            if (!session || !session.is_root) return jsonResponse({ error: 'unauthorized' }, 401);
+            if (path === '/push/subscribe') {
+                const sub = await request.json().catch(() => null);
+                if (!sub || !sub.endpoint) return jsonResponse({ error: 'bad subscription' }, 400);
+                await storeSubscription(env, sub);
+                return jsonResponse({ ok: true });
+            }
+            if (path === '/push/unsubscribe') {
+                const { endpoint } = await request.json().catch(() => ({}));
+                await removeSubscription(env, endpoint);
+                return jsonResponse({ ok: true });
+            }
+            await sendPushToAll(env, 'Kanami-isa mail service', 'Новое письмо от test@example.com', '/mail');
+            return jsonResponse({ ok: true });
         }
 
         // Everything else: serve static files directly

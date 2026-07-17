@@ -5,6 +5,7 @@
  */
 
 import { validateSession } from './auth.js';
+import { sendNewMailPush } from './push.js';
 import PostalMime from 'postal-mime';
 import nodemailer from 'nodemailer';
 
@@ -254,7 +255,16 @@ export async function mailEmail(message, env, ctx) {
         email.replyTo?.address || null,
         JSON.stringify(atts)
       ).run();
-      console.log(`[mail] stored inbound ${message.from} -> ${message.to}: ${email.subject}`);
+       console.log(`[mail] stored inbound ${message.from} -> ${message.to}: ${email.subject}`);
+
+       try {
+         await sendNewMailPush(env, {
+           address: email.from?.address || message.from,
+           isReply: /^\s*re:/i.test(email.subject || ''),
+         });
+       } catch (pe) {
+         console.error('[mail] push failed', pe);
+       }
     } catch (e) {
       console.error("[mail] parse failed", e);
       try {
@@ -333,6 +343,7 @@ export const MAIL_HTML = `<!doctype html>
   <a class="navlink" href="/stenographist/panel.html">Панель</a>
   <a class="navlink" href="/stenographist/index.html">Стенографист</a>
   <button class="btn ghost" id="logout">Выйти</button>
+  <span id="pushControls" style="display:flex;gap:6px;align-items:center;"></span>
   <span id="stat" style="color:#7c8696; font-size:12px;"></span>
 </header>
 <div class="wrap">
@@ -554,5 +565,6 @@ loadState();
 loadMessages();
 </script>
 <script src="/js/auto-logout.js"></script>
+<script src="/push-client.js"></script>
 </body>
 </html>`;
