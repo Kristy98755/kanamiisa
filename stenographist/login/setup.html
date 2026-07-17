@@ -342,6 +342,7 @@
 
                     const opts = beginData.options;
                     opts.challenge = b64urlToBuf(opts.challenge);
+                    if (opts.user && opts.user.id) opts.user.id = b64urlToBuf(opts.user.id);
                     if (opts.excludeCredentials) {
                         opts.excludeCredentials = opts.excludeCredentials.map((c) => ({ ...c, id: b64urlToBuf(c.id) }));
                     }
