@@ -311,7 +311,7 @@ export const MAIL_HTML = `<!doctype html>
 <style>
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
-  body { margin:0; font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:#0f1115; color:#e6e6e6; }
+  body { margin:0; font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:#0f1115; color:#e6e6e6; overflow-x:hidden; }
   header { padding:10px 16px; background:#171a21; border-bottom:1px solid #262b36; display:flex; gap:10px; align-items:center; }
    header b { font-size:16px; }
    .navlink { color:#cdd3dd; text-decoration:none; font-size:13px; padding:6px 10px; border-radius:8px; }
@@ -348,11 +348,11 @@ export const MAIL_HTML = `<!doctype html>
   .att { color:#c9a227; }
   .replied { color:#5fbf7f; font-size:11px; }
   .empty { color:#6b7280; padding:30px; text-align:center; }
-  .msg h2 { margin:0 0 6px; }
-  .msg .hdr { color:#9aa4b2; margin-bottom:14px; }
-  .msg .body { white-space:pre-wrap; background:#0c0e13; border:1px solid #20262f; border-radius:10px; padding:14px; }
+  .msg h2 { margin:0 0 6px; overflow-wrap:anywhere; word-break:break-word; }
+  .msg .hdr { color:#9aa4b2; margin-bottom:14px; overflow-wrap:anywhere; word-break:break-word; }
+  .msg .body { white-space:pre-wrap; background:#0c0e13; border:1px solid #20262f; border-radius:10px; padding:14px; overflow-wrap:anywhere; word-break:break-word; }
   .chips { margin-top:14px; }
-  .chip { display:inline-flex; gap:6px; align-items:center; background:#1a2230; border:1px solid #2a3344; border-radius:8px; padding:5px 10px; margin:4px 4px 0 0; font-size:12px; }
+  .chip { display:inline-flex; gap:6px; align-items:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:#1a2230; border:1px solid #2a3344; border-radius:8px; padding:5px 10px; margin:4px 4px 0 0; font-size:12px; }
   .note { color:#ffcf8e; font-size:12px; margin-top:14px; }
   input[type=checkbox]{ width:15px; height:15px; accent-color:#00f5d4; }
   .compose label { display:block; color:#7c8696; font-size:12px; margin:6px 2px 2px; }
@@ -374,6 +374,10 @@ export const MAIL_HTML = `<!doctype html>
       border:1px solid #2a2f3a;
       border-radius:999px;
       padding:6px 13px;
+      min-width:0;
+      max-width:100%;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
     .side .nav:hover { background:#1b1f27; }
     .side .nav.active {
