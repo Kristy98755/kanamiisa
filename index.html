@@ -458,6 +458,11 @@
       aspect-ratio: 1 / 1;
       border-radius: 25%;
       object-fit: cover;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .donate-img.loaded {
+      opacity: 1;
     }
     .donate-arrow {
       font-size: 28px;
@@ -735,7 +740,7 @@
             <h2 class="section-title">Донаты</h2>
             <div class="donate-inner">
               <div class="donate-text">
-                <img src="yatips.png" alt="Яндекс Чаевые" class="donate-img">
+                <img src="yatips.png" alt="Яндекс Чаевые" class="donate-img" loading="lazy" onload="this.classList.add('loaded')">
                 <p><b><span style="color:red">я</span></b><span style="color:white">ндекс</span><br>чаевые</p>
               </div>
               <a href="https://tips.yandex.ru/guest/payment/3754115" target="_blank" class="donate-qr-link" id="donateQrLink">
