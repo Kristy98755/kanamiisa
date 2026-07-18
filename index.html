@@ -352,8 +352,42 @@
         grid-template-columns: 1fr;
       }
 
+      .hero {
+        padding: 30px 15px;
+      }
+
       .hero__name {
         font-size: 32px;
+      }
+
+      .about-card, .donate-card {
+        overflow: hidden;
+      }
+
+      .about-text {
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+      }
+
+      .donate-inner {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .donate-qr-link {
+        width: 60%;
+        max-width: none;
+        height: auto;
+        align-self: center;
+      }
+
+      .donate-text {
+        flex: none;
+        width: 60%;
+      }
+
+      .donate-desc {
+        transform: none;
       }
     }
 
@@ -445,6 +479,7 @@
 	  color: var(--accent);
 	  text-decoration: none;
 	  transition: color 0.2s;
+	  word-break: break-all;
 	}
 	.donate-desc a:hover {
 	  text-decoration: underline;
