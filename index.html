@@ -964,7 +964,11 @@
       }
     }
     layoutPhotoBg();
-    window.addEventListener('resize', layoutPhotoBg);
+    let _resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(layoutPhotoBg, 150);
+    });
 
     // ===== CURSOR PARTICLE TRAIL =====
     const trailCanvas = document.getElementById('cursorTrail');
@@ -980,6 +984,7 @@
     window.addEventListener('resize', resizeTrail);
 
     document.addEventListener('mousemove', e => {
+      if (window.innerWidth < 768) return;
       mouse.x = e.clientX;
       mouse.y = e.clientY;
       for (let i = 0; i < 2; i++) {
@@ -996,6 +1001,7 @@
     });
 
     document.addEventListener('touchmove', e => {
+      if (window.innerWidth < 768) return;
       const t = e.touches[0];
       mouse.x = t.clientX;
       mouse.y = t.clientY;
@@ -1018,6 +1024,7 @@
     }
 
     function animateTrail() {
+      if (window.innerWidth < 768) { requestAnimationFrame(animateTrail); return; }
       trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
       const color = getAccentColor();
 
