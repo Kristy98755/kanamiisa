@@ -453,12 +453,12 @@ async function loadState(){
     return n;
   };
   side.appendChild(el('h4', null, 'Папки'));
-  side.appendChild(mk('Входящие', st.folders.inbox, st.folders.inboxUnread, S.folder==='inbox' && !S.alias, () => { S.folder='inbox'; S.alias=null; loadMessages(); }));
-  side.appendChild(mk('Отправленные', st.folders.sent, null, S.folder==='sent', () => { S.folder='sent'; S.alias=null; loadMessages(); }));
-  side.appendChild(mk('Корзина', st.folders.trash, null, S.folder==='trash', () => { S.folder='trash'; S.alias=null; loadMessages(); }));
+  side.appendChild(mk('Входящие', st.folders.inbox, st.folders.inboxUnread, S.folder==='inbox' && !S.alias, () => { S.folder='inbox'; S.alias=null; loadState(); loadMessages(); }));
+  side.appendChild(mk('Отправленные', st.folders.sent, null, S.folder==='sent', () => { S.folder='sent'; S.alias=null; loadState(); loadMessages(); }));
+  side.appendChild(mk('Корзина', st.folders.trash, null, S.folder==='trash', () => { S.folder='trash'; S.alias=null; loadState(); loadMessages(); }));
   side.appendChild(el('h4', null, 'Ящики (алиасы)'));
   for(const a of st.aliases){
-    side.appendChild(mk(a.recipient, a.c, a.u, S.alias===a.recipient, ((rec)=>() => { S.alias=rec; S.folder='inbox'; loadMessages(); })(a.recipient)));
+    side.appendChild(mk(a.recipient, a.c, a.u, S.alias===a.recipient, ((rec)=>() => { S.alias=rec; S.folder='inbox'; loadState(); loadMessages(); })(a.recipient)));
   }
    side.appendChild(el('button', { class:'btn ghost', onclick: () => clearFolder() }, 'Очистить папку'));
   if (st.folders.trash > 0) side.appendChild(el('button', { class:'btn ghost', onclick: () => clearFolder('trash') }, 'Очистить корзину'));
