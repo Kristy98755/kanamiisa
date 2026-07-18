@@ -306,7 +306,7 @@
       grid-template-columns: 1fr 1fr;
       gap: 40px;
       margin-bottom: 60px;
-      align-items: start;
+      align-items: stretch;
     }
 
     .two-col>div {
@@ -314,6 +314,25 @@
       backdrop-filter: blur(12px);
       border-radius: 16px;
       padding: 20px;
+    }
+
+    .left-col {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .about-card {
+      background: none;
+      padding: 0;
+      backdrop-filter: none;
+    }
+
+    .donate-card {
+      margin-top: auto;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     @media (max-width: 768px) {
@@ -662,14 +681,28 @@
     <div class="top-section">
 
       <div class="two-col">
-        <div>
-          <h2 class="section-title">Обо мне</h2>
-          <div class="about-text">
-            <p><strong>Канами</strong> — kanashi (печаль) + ookami (волк). Волк-одиночка, который нашёл свой путь через
-              косплей и медицину.</p>
-            <p><strong>isa</strong> — от японского isha (врач). Я учусь в местной медакадемии и верю, что искусство и
-              наука — это два крыла одного организма.</p>
-            <p>В августе 2026 — <strong>Comic Con Astana</strong>. Буду там. С костюмом, который запомнится.</p>
+        <div class="left-col">
+          <div class="about-card">
+            <h2 class="section-title">Обо мне</h2>
+            <div class="about-text">
+              <p><strong>Канами</strong> — kanashi (печаль) + ookami (волк). Волк-одиночка, который нашёл свой путь через
+                косплей и медицину.</p>
+              <p><strong>isa</strong> — от японского isha (врач). Я учусь в местной медакадемии и верю, что искусство и
+                наука — это два крыла одного организма.</p>
+              <p>В августе 2026 — <strong>Comic Con Astana</strong>. Буду там. С костюмом, который запомнится.</p>
+            </div>
+          </div>
+          <div class="donate-card" id="donateCard">
+            <h2 class="section-title">Донаты</h2>
+            <div class="donate-inner">
+              <div class="donate-text">
+                <p>Яндекс чеки</p>
+                <span class="donate-arrow">→</span>
+              </div>
+              <a href="https://tips.yandex.ru/guest/payment/3754115" target="_blank" class="donate-qr-link" id="donateQrLink">
+                <div class="donate-qr" id="donateQr"></div>
+              </a>
+            </div>
           </div>
         </div>
         <div>
@@ -745,19 +778,6 @@
 
           </div>
         </div>
-      </div>
-    </div>
-
-    <div class="donate-card" id="donateCard">
-      <h2 class="section-title">Донаты</h2>
-      <div class="donate-inner">
-        <div class="donate-text">
-          <p>Яндекс чеки</p>
-          <span class="donate-arrow">→</span>
-        </div>
-        <a href="https://tips.yandex.ru/guest/payment/3754115" target="_blank" class="donate-qr-link" id="donateQrLink">
-          <div class="donate-qr" id="donateQr"></div>
-        </a>
       </div>
     </div>
 
