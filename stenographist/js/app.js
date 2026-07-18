@@ -92,12 +92,17 @@
             const data = await res.json();
             console.log('[Admin] session check:', data);
             if (data.valid && data.role === 'root') {
-                const btn = document.createElement('a');
-                btn.href = '/stenographist/panel.html';
-                btn.className = 'header__admin-btn';
-                btn.textContent = 'Панель управления';
-                btn.title = 'Управление пользователями и логами';
-                document.querySelector('.header__right').appendChild(btn);
+                const panel = document.createElement('a');
+                panel.href = '/stenographist/panel.html';
+                panel.className = 'header__nav-btn';
+                panel.textContent = 'Панель';
+                document.querySelector('.header__right').prepend(panel);
+
+                const mail = document.createElement('a');
+                mail.href = '/mail';
+                mail.className = 'header__nav-btn';
+                mail.textContent = 'Почта';
+                document.querySelector('.header__right').prepend(mail);
             }
         } catch (e) {
             console.warn('[Admin] Session check failed:', e);
