@@ -358,21 +358,43 @@ export const MAIL_HTML = `<!doctype html>
   .compose label { display:block; color:#7c8696; font-size:12px; margin:6px 2px 2px; }
   .mail-back { display:none; }
   @media (max-width: 820px) {
-    header { flex-wrap:wrap; row-gap:6px; }
-    .wrap { grid-template-columns: 1fr; height: calc(100vh - 45px); }
-    .col.side { border-right:0; border-bottom:1px solid #262b36; display:flex; gap:6px; align-items:center; overflow-x:auto; padding:8px; }
+    header { flex-wrap:wrap; row-gap:6px; padding:8px 12px; }
+    header .navlink { display:none; }
+    .wrap { grid-template-columns:1fr; height:calc(100vh - 41px); }
+    .col.side {
+      border-right:0; border-bottom:1px solid #262b36;
+      display:flex; flex-wrap:wrap; align-items:center; gap:6px;
+      padding:8px 12px;
+    }
     .col.side h4 { display:none; }
-    .col.side .search { width:150px; margin:0; flex:0 0 auto; }
-    .col.side .btn { width:auto; margin:0; flex:0 0 auto; }
-    .side .nav { white-space:nowrap; padding:6px 10px; }
+    .col.side .search { flex:1 1 100%; width:100%; margin:0 0 4px; }
+    .col.side .btn.side-clear { display:none; }
+    .side .nav {
+      white-space:nowrap;
+      border:1px solid #2a2f3a;
+      border-radius:999px;
+      padding:6px 13px;
+    }
+    .side .nav:hover { background:#1b1f27; }
+    .side .nav.active {
+      background:#06231f;
+      border-color:#00f5d4;
+      box-shadow:0 0 14px rgba(0,245,212,.35);
+    }
+    .toolbar .btn { padding:6px 10px; font-size:12px; }
     .col.view { display:none; }
     .wrap > div:nth-child(2) { display:flex; flex-direction:column; min-height:0; }
     .wrap #list { height:auto !important; flex:1 1 auto; }
     body.mail-open .col.side,
     body.mail-open .wrap > div:nth-child(2) { display:none; }
-    body.mail-open .col.view { display:block; position:fixed; inset:45px 0 0 0; background:#0f1115; overflow:auto; z-index:40; padding:16px; border-right:0; }
-    .mail-back { display:inline-block; margin-bottom:12px; }
+    body.mail-open .col.view {
+      display:block; position:fixed; inset:41px 0 0 0; background:#0f1115; overflow:auto; z-index:40;
+      padding:14px 14px 80px; border-right:0;
+      animation: mailSlide .22s ease;
+    }
+    .mail-back { display:inline-flex; align-items:center; gap:6px; margin-bottom:14px; }
   }
+  @keyframes mailSlide { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
 </style>
 </head>
 <body>
@@ -460,8 +482,8 @@ async function loadState(){
   for(const a of st.aliases){
     side.appendChild(mk(a.recipient, a.c, a.u, S.alias===a.recipient, ((rec)=>() => { S.alias=rec; S.folder='inbox'; loadState(); loadMessages(); })(a.recipient)));
   }
-   side.appendChild(el('button', { class:'btn ghost', onclick: () => clearFolder() }, 'Очистить папку'));
-  if (st.folders.trash > 0) side.appendChild(el('button', { class:'btn ghost', onclick: () => clearFolder('trash') }, 'Очистить корзину'));
+   side.appendChild(el('button', { class:'btn ghost side-clear', onclick: () => clearFolder() }, 'Очистить папку'));
+   if (st.folders.trash > 0) side.appendChild(el('button', { class:'btn ghost side-clear', onclick: () => clearFolder('trash') }, 'Очистить корзину'));
   document.getElementById('stat').textContent = 'всего: ' + st.stats.total + ' · ★ ' + st.stats.starred;
 }
 async function loadMessages(){
