@@ -360,11 +360,13 @@ export const MAIL_HTML = `<!doctype html>
   @media (max-width: 820px) {
     header { flex-wrap:wrap; row-gap:6px; padding:8px 12px; }
     header .navlink { display:none; }
-    .wrap { grid-template-columns:1fr; height:calc(100vh - 41px); }
+    .wrap { grid-template-columns:1fr; height:calc(100vh - 41px); overflow-x:hidden; }
     .col.side {
       border-right:0; border-bottom:1px solid #262b36;
       display:flex; flex-wrap:wrap; align-items:center; gap:6px;
       padding:8px 12px;
+      min-width:0;
+      overflow-x:hidden;
     }
     .col.side h4 { display:none; }
     .col.side .search { flex:1 1 100%; width:100%; margin:0 0 4px; }
@@ -386,9 +388,12 @@ export const MAIL_HTML = `<!doctype html>
       box-shadow:0 0 14px rgba(0,245,212,.35);
     }
     .toolbar .btn { padding:6px 10px; font-size:12px; }
+    .toolbar { overflow-x:hidden; min-width:0; }
+    .item { min-width:0; }
+    .item .main { min-width:0; }
     .col.view { display:none; }
-    .wrap > div:nth-child(2) { display:flex; flex-direction:column; min-height:0; }
-    .wrap #list { height:auto !important; flex:1 1 auto; }
+    .wrap > div:nth-child(2) { display:flex; flex-direction:column; min-height:0; min-width:0; overflow-x:hidden; }
+    .wrap #list { height:auto !important; flex:1 1 auto; min-width:0; overflow-x:hidden; }
     body.mail-open .col.side,
     body.mail-open .wrap > div:nth-child(2) { display:none; }
     body.mail-open .col.view {
