@@ -103,6 +103,21 @@ body {
     color: #fff;
 }
 
+.header__nav-btn {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--color-primary-dim);
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: background var(--transition), color var(--transition);
+}
+.header__nav-btn:hover {
+    background: var(--color-primary);
+    color: #fff;
+}
+
 .header__right {
     display: flex;
     align-items: center;
@@ -1154,6 +1169,11 @@ body {
 
     .tabs {
         flex-direction: column;
+    }
+
+    .header__nav-btn {
+        font-size: 11px;
+        padding: 5px 10px;
     }
 }
 

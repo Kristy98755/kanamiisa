@@ -37,7 +37,6 @@
     const btnNew = $('#btnNew');
     const btnCopyText = $('#btnCopyText');
     const btnPrint = $('#btnPrint');
-    const modeBadge = $('#modeBadge');
     const toast = $('#toast');
     const sidebar = $('#sidebar');
     const historyList = $('#historyList');
@@ -68,13 +67,6 @@
         resizeCanvas();
         drawIdleWaveform();
         window.addEventListener('resize', () => { resizeCanvas(); drawIdleWaveform(); });
-
-        if (DEMO_CONFIG.USE_DEMO) {
-            modeBadge.textContent = 'Демо-режим';
-        } else {
-            modeBadge.textContent = 'Production';
-            modeBadge.style.background = 'var(--color-success)';
-        }
 
         // Collect browser fingerprint
         try {
@@ -481,12 +473,7 @@
 
         try {
             let result;
-
-            if (DEMO_CONFIG.USE_DEMO) {
-                result = await demoProcess(handleProgress);
-            } else {
-                result = await workerProcess(audioBlob, handleProgress);
-            }
+            result = await workerProcess(audioBlob, handleProgress);
 
             if (!result || !result.medicalHistory) {
                 throw new Error('Сервер не вернул данные.');

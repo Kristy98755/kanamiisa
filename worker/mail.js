@@ -64,8 +64,9 @@ async function listMessages(env, url) {
   if (p.get("unread") === "1") where.push("read = 0");
   if (p.get("starred") === "1") where.push("starred = 1");
   if (p.get("q")) {
-    where.push("(sender LIKE ? OR recipient LIKE ? OR subject LIKE ? OR body LIKE ?)");
-    binds.push("%" + p.get("q") + "%", "%" + p.get("q") + "%", "%" + p.get("q") + "%", "%" + p.get("q") + "%");
+    const q = "%" + p.get("q").toLowerCase() + "%";
+    where.push("(LOWER(sender) LIKE ? OR LOWER(recipient) LIKE ? OR LOWER(subject) LIKE ? OR LOWER(body) LIKE ?)");
+    binds.push(q, q, q, q);
   }
   const sql = "SELECT id, sender, recipient, from_name, subject, body, date, read, starred, replied, folder, attachments FROM emails"
     + (where.length ? " WHERE " + where.join(" AND ") : "")
@@ -316,7 +317,9 @@ export const MAIL_HTML = `<!doctype html>
    header b { font-size:16px; }
    .navlink { color:#cdd3dd; text-decoration:none; font-size:13px; padding:6px 10px; border-radius:8px; }
    .navlink:hover { background:#1b1f27; }
-  .pill { font-size:11px; padding:1px 8px; border-radius:999px; background:#06231f; color:#7df3e6; }
+   .hamburger { display:none; background:none; border:0; color:#e6e6e6; font-size:22px; cursor:pointer; padding:4px 8px; }
+   .drawer-actions { display:none; }
+   .drawer-nav { display:none; }
   .wrap { display:grid; grid-template-columns: 250px 380px 1fr; height: calc(100vh - 45px); }
   .col { overflow:auto; border-right:1px solid #262b36; }
   .col.view { border-right:0; padding:22px; }
@@ -329,10 +332,13 @@ export const MAIL_HTML = `<!doctype html>
   .nav .unread { background:#00f5d4; color:#04120f; border-radius:999px; padding:0 7px; font-size:11px; font-weight:600; box-shadow:0 0 10px rgba(0,245,212,.5); }
   .search { width:100%; padding:8px 10px; margin:6px 0; background:#0c0e13; color:#e6e6e6; border:1px solid #2a2f3a; border-radius:8px; }
   .side .btn { width:100%; margin-top:6px; }
-  .toolbar { display:flex; gap:6px; padding:8px 10px; border-bottom:1px solid #262b36; align-items:center; flex-wrap:wrap; }
-  .btn { background:#00f5d4; color:#04120f; border:0; padding:7px 12px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; box-shadow: 0 0 18px rgba(0,245,212,.6); }
+  .toolbar { display:flex; gap:6px; padding:8px 12px; border-bottom:1px solid #262b36; align-items:center; flex-wrap:wrap; }
+  .toolbar input[type=checkbox]{ width:18px; height:18px; accent-color:#00f5d4; flex-shrink:0; }
+  .btn { background:#00f5d4; color:#04120f; border:0; padding:7px 12px; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; box-shadow: 0 0 18px rgba(0,245,212,.6); display:inline-flex; align-items:center; gap:5px; }
   .btn.ghost { background:#0c2a27; color:#7df3e6; box-shadow:0 0 14px rgba(0,245,212,.22); }
   .btn:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
+  .btn.star-btn { font-size:18px; line-height:1; padding:4px 8px; }
+  .tb-icon { width:18px; height:18px; fill:currentColor; display:none; }
   .item { display:flex; gap:8px; padding:10px 12px; border-bottom:1px solid #1a1e26; cursor:pointer; align-items:flex-start; }
   .item:hover { background:#161a22; }
   .item.active { background:#06231f; box-shadow: inset 3px 0 0 #00f5d4, 0 0 18px rgba(0,245,212,.14); }
@@ -354,23 +360,35 @@ export const MAIL_HTML = `<!doctype html>
   .chips { margin-top:14px; }
   .chip { display:inline-flex; gap:6px; align-items:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:#1a2230; border:1px solid #2a3344; border-radius:8px; padding:5px 10px; margin:4px 4px 0 0; font-size:12px; }
   .note { color:#ffcf8e; font-size:12px; margin-top:14px; }
-  input[type=checkbox]{ width:15px; height:15px; accent-color:#00f5d4; }
+  .item input[type=checkbox]{ width:18px; height:18px; accent-color:#00f5d4; flex-shrink:0; }
   .compose label { display:block; color:#7c8696; font-size:12px; margin:6px 2px 2px; }
   .mail-back { display:none; }
+  .drawer-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:49; }
+  body.drawer-open .drawer-overlay { display:block; }
   @media (max-width: 820px) {
-    header { flex-wrap:wrap; row-gap:6px; padding:8px 12px; }
+    header { flex-wrap:wrap; row-gap:6px; padding:8px 12px; align-items:center; }
     header .navlink { display:none; }
+    header #stat { display:none; }
+    .hamburger { display:inline-flex; margin-left:auto; }
     .wrap { grid-template-columns:1fr; height:calc(100vh - 41px); overflow-x:hidden; }
     .col.side {
-      border-right:0; border-bottom:1px solid #262b36;
-      display:flex; flex-wrap:wrap; align-items:center; gap:6px;
-      padding:8px 12px;
+      position:fixed; top:0; left:0; bottom:0; width:280px; background:#171a21; z-index:50;
+      border-right:1px solid #262b36;
+      display:flex; flex-direction:column; gap:6px;
+      padding:12px;
+      transform:translateX(-100%);
+      transition: transform .22s ease;
+      overflow-y:auto;
       min-width:0;
-      overflow-x:hidden;
     }
-    .col.side h4 { display:none; }
-    .col.side .search { flex:1 1 100%; width:100%; margin:0 0 4px; }
-    .col.side .btn.side-clear { display:none; }
+    body.drawer-open .col.side { transform:translateX(0); }
+    .col.side h4 { margin:10px 0 4px; color:#7c8696; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+    .col.side .search { width:100%; margin:0 0 4px; }
+    .col.side .btn.side-clear { display:block; width:100%; }
+   .drawer-actions { display:flex; flex-direction:column; gap:6px; margin-top:auto; padding-top:12px; border-top:1px solid #262b36; }
+   .drawer-nav { display:flex; flex-direction:column; gap:4px; margin-top:8px; padding-top:8px; border-top:1px solid #262b36; }
+   .drawer-nav-link { color:#cdd3dd; text-decoration:none; font-size:13px; padding:8px 10px; border-radius:8px; }
+   .drawer-nav-link:hover { background:#1b1f27; }
     .side .nav {
       white-space:nowrap;
       border:1px solid #2a2f3a;
@@ -387,8 +405,11 @@ export const MAIL_HTML = `<!doctype html>
       border-color:#00f5d4;
       box-shadow:0 0 14px rgba(0,245,212,.35);
     }
-    .toolbar .btn { padding:6px 10px; font-size:12px; }
-    .toolbar { overflow-x:hidden; min-width:0; }
+    .toolbar .btn { padding:6px 8px; font-size:18px; }
+    .toolbar .tb-icon { display:inline-block; }
+    .toolbar .tb-text { display:none; }
+    .toolbar { overflow-x:auto; min-width:0; flex-wrap:nowrap; justify-content:space-between; align-items:center; }
+    .toolbar input[type=checkbox] { flex-shrink:0; }
     .item { min-width:0; }
     .item .main { min-width:0; }
     .col.view { display:none; }
@@ -408,26 +429,26 @@ export const MAIL_HTML = `<!doctype html>
 </head>
 <body>
 <header>
-  <b>kanamiisa mail</b><span class="pill">support@kanamiisa.uk</span>
+  <b>Kanami-isa Mail Service</b>
   <span style="flex:1"></span>
    <a class="navlink" href="/stenographist/panel.html">Панель</a>
    <a class="navlink" href="/stenographist/index.html">Стенографист</a>
-   <button class="btn ghost" id="tgtest">📨 Тест Telegram</button>
-   <button class="btn ghost" id="logout">Выйти</button>
    <span id="stat" style="color:#7c8696; font-size:12px;"></span>
+   <button class="hamburger" id="hamburger">☰</button>
 </header>
+<div class="drawer-overlay" id="drawerOverlay"></div>
 <div class="wrap">
   <div class="col side" id="side"></div>
   <div>
     <div class="toolbar">
       <input type="checkbox" id="selall" title="Выбрать все">
-      <button class="btn ghost" data-act="read">Прочитано</button>
-      <button class="btn ghost" data-act="unread">Непрочитано</button>
-      <button class="btn ghost" data-act="star">★</button>
-      <button class="btn ghost" data-act="unstar">☆</button>
-      <button class="btn ghost" data-act="delete">Удалить</button>
-      <button class="btn ghost" id="refresh">Обновить</button>
-      <button class="btn" id="compose-btn">Написать</button>
+      <button class="btn ghost" data-act="read"><svg class="tb-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span class="tb-text">Прочитано</span></button>
+      <button class="btn ghost" data-act="unread"><svg class="tb-icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2 7l10 6 10-6" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="19" cy="6" r="3" fill="#00f5d4" stroke="#00f5d4" stroke-width="0.5"/></svg><span class="tb-text">Непрочитано</span></button>
+      <button class="btn ghost star-btn" data-act="star">★</button>
+      <button class="btn ghost star-btn" data-act="unstar">☆</button>
+      <button class="btn ghost" data-act="delete"><svg class="tb-icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg><span class="tb-text">Удалить</span></button>
+      <button class="btn ghost" id="refresh"><svg class="tb-icon" viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg><span class="tb-text">Обновить</span></button>
+      <button class="btn" id="compose-btn"><svg class="tb-icon" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg><span class="tb-text">Написать</span></button>
     </div>
     <div class="col" id="list" style="height:calc(100vh - 45px - 45px);"></div>
   </div>
@@ -473,7 +494,7 @@ async function loadState(){
   const st = await api('/mail/api/state');
   const side = document.getElementById('side');
   side.innerHTML = '';
-  const search = el('input', { class:'search', placeholder:'Поиск…', oninput: debounce(() => { S.q = search.value; S.alias=null; S.folder='inbox'; loadMessages(); }, 300) });
+  const search = el('input', { class:'search', placeholder:'Поиск…', autocapitalize:'off', autocomplete:'off', spellcheck:'false', inputmode:'search', oninput: debounce(() => { S.q = search.value; S.alias=null; S.folder='inbox'; loadMessages(); }, 300) });
   side.appendChild(search);
 
   const mk = (label, count, unread, active, onclick) => {
@@ -484,15 +505,23 @@ async function loadState(){
     return n;
   };
   side.appendChild(el('h4', null, 'Папки'));
-  side.appendChild(mk('Входящие', st.folders.inbox, st.folders.inboxUnread, S.folder==='inbox' && !S.alias, () => { S.folder='inbox'; S.alias=null; loadState(); loadMessages(); }));
-  side.appendChild(mk('Отправленные', st.folders.sent, null, S.folder==='sent', () => { S.folder='sent'; S.alias=null; loadState(); loadMessages(); }));
-  side.appendChild(mk('Корзина', st.folders.trash, null, S.folder==='trash', () => { S.folder='trash'; S.alias=null; loadState(); loadMessages(); }));
+  side.appendChild(mk('Входящие', st.folders.inbox, st.folders.inboxUnread, S.folder==='inbox' && !S.alias, () => { S.folder='inbox'; S.alias=null; document.body.classList.remove('drawer-open'); loadState(); loadMessages(); }));
+  side.appendChild(mk('Отправленные', st.folders.sent, null, S.folder==='sent', () => { S.folder='sent'; S.alias=null; document.body.classList.remove('drawer-open'); loadState(); loadMessages(); }));
+  side.appendChild(mk('Корзина', st.folders.trash, null, S.folder==='trash', () => { S.folder='trash'; S.alias=null; document.body.classList.remove('drawer-open'); loadState(); loadMessages(); }));
   side.appendChild(el('h4', null, 'Ящики (алиасы)'));
   for(const a of st.aliases){
-    side.appendChild(mk(a.recipient, a.c, a.u, S.alias===a.recipient, ((rec)=>() => { S.alias=rec; S.folder='inbox'; loadState(); loadMessages(); })(a.recipient)));
+    side.appendChild(mk(a.recipient, a.c, a.u, S.alias===a.recipient, ((rec)=>() => { S.alias=rec; S.folder='inbox'; document.body.classList.remove('drawer-open'); loadState(); loadMessages(); })(a.recipient)));
   }
    side.appendChild(el('button', { class:'btn ghost side-clear', onclick: () => clearFolder() }, 'Очистить папку'));
    if (st.folders.trash > 0) side.appendChild(el('button', { class:'btn ghost side-clear', onclick: () => clearFolder('trash') }, 'Очистить корзину'));
+   side.appendChild(el('div', { class:'drawer-nav' },
+     el('a', { class:'drawer-nav-link', href:'/stenographist/panel.html' }, 'Панель'),
+     el('a', { class:'drawer-nav-link', href:'/stenographist/index.html' }, 'Стенографист')
+   ));
+   side.appendChild(el('div', { class:'drawer-actions' },
+     el('button', { class:'btn ghost', onclick: async () => { await fetch('/mail/api/test-telegram').catch(()=>{}); } }, '📨 Тест Telegram'),
+     el('button', { class:'btn ghost', onclick: async () => { await fetch('/login/api/logout', {method:'POST'}).catch(()=>{}); location.href='/login?from=mail'; } }, 'Выйти')
+   ));
   document.getElementById('stat').textContent = 'всего: ' + st.stats.total + ' · ★ ' + st.stats.starred;
 }
 async function loadMessages(){
@@ -530,6 +559,7 @@ async function loadMessages(){
 async function open(id){
   S.openId = id;
   document.body.classList.add('mail-open');
+  document.body.classList.remove('drawer-open');
   const m = await api('/mail/api/messages/' + id);
   const v = document.getElementById('view');
   v.innerHTML = '';
@@ -626,25 +656,20 @@ document.getElementById('selall').addEventListener('change', (e) => {
 });
 document.querySelectorAll('.toolbar [data-act]').forEach(b => b.addEventListener('click', () => bulk(b.dataset.act)));
 document.getElementById('refresh').addEventListener('click', () => { loadState(); loadMessages(); });
-document.getElementById('logout').addEventListener('click', async () => {
-  await fetch('/login/api/logout', { method: 'POST' }).catch(() => {});
-  location.href = '/login?from=mail';
-});
-document.getElementById('tgtest').addEventListener('click', async () => {
-  const b = document.getElementById('tgtest');
-  const old = b.textContent;
-  try {
-    await fetch('/mail/api/test-telegram');
-    b.textContent = 'Отправлено!';
-  } catch (e) {
-    b.textContent = 'Ошибка';
-  }
-  setTimeout(() => (b.textContent = old), 2000);
-});
 document.getElementById('compose-btn').addEventListener('click', () => compose());
 document.getElementById('c-close').addEventListener('click', closeCompose);
 document.getElementById('c-send').addEventListener('click', sendMail);
 function debounce(fn, ms){ let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+document.getElementById('hamburger').addEventListener('click', () => {
+  document.body.classList.toggle('drawer-open');
+});
+document.getElementById('drawerOverlay').addEventListener('click', () => {
+  document.body.classList.remove('drawer-open');
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') document.body.classList.remove('drawer-open');
+});
 
 loadState();
 loadMessages();
