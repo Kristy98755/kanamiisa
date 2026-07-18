@@ -79,7 +79,7 @@
       border-radius: 50%;
       filter: blur(120px);
       opacity: 0.4;
-      transition: all 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      will-change: transform;
     }
 
     .bg-gradient__orb--1 {
@@ -984,7 +984,6 @@
     window.addEventListener('resize', resizeTrail);
 
     document.addEventListener('mousemove', e => {
-      if (window.innerWidth < 768) return;
       mouse.x = e.clientX;
       mouse.y = e.clientY;
       for (let i = 0; i < 2; i++) {
@@ -1001,7 +1000,6 @@
     });
 
     document.addEventListener('touchmove', e => {
-      if (window.innerWidth < 768) return;
       const t = e.touches[0];
       mouse.x = t.clientX;
       mouse.y = t.clientY;
@@ -1024,7 +1022,6 @@
     }
 
     function animateTrail() {
-      if (window.innerWidth < 768) { requestAnimationFrame(animateTrail); return; }
       trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
       const color = getAccentColor();
 
