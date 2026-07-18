@@ -893,6 +893,7 @@
       if (!pb || !hero) return;
       const vw = window.innerWidth;
       const imgs = Array.from(pb.querySelectorAll('.photo-bg__img'));
+      imgs.forEach(img => img.style.display = '');
       const isMobile = vw < 768;
 
       // Mobile blacklist: cosplay-13(idx 12), 15(idx 14), 23(idx 22) -> 25,26,27
@@ -902,11 +903,11 @@
         MOBILE_BLACKLIST.forEach((blackIdx, i) => {
           const replaceIdx = MOBILE_REPLACE[i];
           if (imgs[blackIdx] && imgs[replaceIdx]) {
-            const src = imgs[replaceIdx].currentSrc || imgs[replaceIdx].src;
-            imgs[blackIdx].src = src;
+            imgs[blackIdx].src = imgs[replaceIdx].src;
             const source = imgs[blackIdx].closest('picture')?.querySelector('source');
             const replaceSource = imgs[replaceIdx].closest('picture')?.querySelector('source');
             if (source && replaceSource) source.srcset = replaceSource.srcset;
+            imgs[replaceIdx].style.display = 'none';
           }
         });
       }
@@ -930,7 +931,8 @@
       const targetH = baseHeightClipped * s;
       const w = baseW * s, h = baseH * s, gx = gapX * s, gy = gapY * s;
       const rotations = [7, -5, 9, -7, 5, -9, 8, -6, -8, 6, -9, 7, -5, 9, -7, 5, -9, 6, -6, 8, -8, 7, -5, 9];
-      imgs.forEach((img, i) => {
+      const visibleImgs = imgs.filter(img => img.style.display !== 'none');
+      visibleImgs.forEach((img, i) => {
         const col = i % COLS, row = Math.floor(i / COLS);
         const x = col * gx - (w * 0.1);
         const y = row * gy - (h * 0.05);
