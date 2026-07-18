@@ -387,6 +387,45 @@
       letter-spacing: 1px;
     }
 
+    .donate-link {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 20px;
+      padding: 16px;
+      border-radius: 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      text-decoration: none;
+      color: var(--text);
+      transition: all 0.25s;
+      backdrop-filter: blur(10px);
+    }
+    .donate-link:hover {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      transform: translateX(4px);
+    }
+    .donate-qr {
+      width: 80px;
+      height: 80px;
+      flex-shrink: 0;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+      padding: 4px;
+    }
+    .donate-qr canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+    .donate-label {
+      font-weight: 500;
+      font-size: 14px;
+    }
+
     .wave-container {
       position: absolute;
       top: 0;
@@ -626,6 +665,10 @@
               наука — это два крыла одного организма.</p>
             <p>В августе 2026 — <strong>Comic Con Astana</strong>. Буду там. С костюмом, который запомнится.</p>
           </div>
+          <a href="https://tips.yandex.ru/guest/payment/3754115" target="_blank" class="donate-link">
+            <div class="donate-qr" id="donateQr"></div>
+            <span class="donate-label">Донаты</span>
+          </a>
         </div>
         <div>
           <h2 class="section-title">Ссылки</h2>
@@ -997,6 +1040,17 @@
             setTimeout(() => note.remove(), 3500);
           }
         }
+      });
+    }
+
+    // ===== DONATE QR =====
+    const qrEl = document.getElementById('donateQr');
+    if (qrEl && typeof QRCode !== 'undefined') {
+      new QRCode(qrEl, {
+        text: 'https://tips.yandex.ru/guest/payment/3754115',
+        width: 80,
+        height: 80,
+        correctLevel: QRCode.CorrectLevel.M
       });
     }
   </script>
