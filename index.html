@@ -387,43 +387,49 @@
       letter-spacing: 1px;
     }
 
-    .donate-link {
+    .donate-card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 60px;
+    }
+    .donate-inner {
       display: flex;
       align-items: center;
-      gap: 16px;
-      margin-top: 20px;
-      padding: 16px;
-      border-radius: 12px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      text-decoration: none;
-      color: var(--text);
-      transition: all 0.25s;
-      backdrop-filter: blur(10px);
+      justify-content: space-between;
     }
-    .donate-link:hover {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-      transform: translateX(4px);
+    .donate-text {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-dim);
+      font-size: 15px;
+    }
+    .donate-arrow {
+      font-size: 28px;
+      color: var(--accent);
+    }
+    .donate-qr-link {
+      display: block;
+      flex-shrink: 0;
     }
     .donate-qr {
-      width: 80px;
-      height: 80px;
-      flex-shrink: 0;
-      border-radius: 8px;
+      width: 120px;
+      height: 120px;
+      border-radius: 10px;
       overflow: hidden;
       background: #fff;
-      padding: 4px;
+      padding: 6px;
+      transition: transform 0.2s;
     }
-    .donate-qr canvas {
+    .donate-qr:hover {
+      transform: scale(1.05);
+    }
+    .donate-qr canvas, .donate-qr img {
       width: 100% !important;
       height: 100% !important;
       display: block;
-    }
-    .donate-label {
-      font-weight: 500;
-      font-size: 14px;
     }
 
     .wave-container {
@@ -665,10 +671,19 @@
               наука — это два крыла одного организма.</p>
             <p>В августе 2026 — <strong>Comic Con Astana</strong>. Буду там. С костюмом, который запомнится.</p>
           </div>
-          <a href="https://tips.yandex.ru/guest/payment/3754115" target="_blank" class="donate-link">
-            <div class="donate-qr" id="donateQr"></div>
-            <span class="donate-label">Донаты</span>
-          </a>
+        </div>
+        <div class="donate-card" id="donateCard">
+          <h2 class="section-title">Донаты</h2>
+          <div class="donate-inner">
+            <div class="donate-text">
+              <p>Яндекс чеки</p>
+              <span class="donate-arrow">→</span>
+            </div>
+            <a href="https://tips.yandex.ru/guest/payment/3754115" target="_blank" class="donate-qr-link" id="donateQrLink">
+              <div class="donate-qr" id="donateQr"></div>
+            </a>
+          </div>
+        </div>
         </div>
         <div>
           <h2 class="section-title">Ссылки</h2>
@@ -1045,13 +1060,32 @@
 
     // ===== DONATE QR =====
     const qrEl = document.getElementById('donateQr');
-    if (qrEl && typeof QRCode !== 'undefined') {
-      new QRCode(qrEl, {
-        text: 'https://tips.yandex.ru/guest/payment/3754115',
-        width: 80,
-        height: 80,
-        correctLevel: QRCode.CorrectLevel.M
-      });
+    if (qrEl && typeof qrcode !== 'undefined') {
+      try {
+        const qr = qrcode(0, 'M');
+        qr.addData('https://tips.yandex.ru/guest/payment/3754115');
+        qr.make();
+        const size = 108;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const modules = qr.getModuleCount();
+        const cellSize = size / modules;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = '#000';
+        for (let r = 0; r < modules; r++) {
+          for (let c = 0; c < modules; c++) {
+            if (qr.isDark(r, c)) {
+              ctx.fillRect(c * cellSize, r * cellSize, cellSize + 0.5, cellSize + 0.5);
+            }
+          }
+        }
+        qrEl.appendChild(canvas);
+      } catch (e) {
+        console.warn('QR generation failed:', e);
+      }
     }
   </script>
 </body>
