@@ -9,5 +9,8 @@
     "@simplewebauthn/server": "^13.3.2",
     "nodemailer": "^6.10.1",
     "postal-mime": "^2.4.1"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.3"
   }
 }

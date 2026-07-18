@@ -741,6 +741,9 @@
     <picture><source srcset="gallery/cosplay-22.webp" type="image/webp"><img class="photo-bg__img" src="gallery/cosplay-22-sm.jpg"></picture>
     <picture><source srcset="gallery/cosplay-23.webp" type="image/webp"><img class="photo-bg__img" src="gallery/cosplay-23-sm.jpg"></picture>
     <picture><source srcset="gallery/cosplay-24.webp" type="image/webp"><img class="photo-bg__img" src="gallery/cosplay-24-sm.jpg"></picture>
+    <picture><source srcset="gallery/cosplay-25.webp" type="image/webp"><img class="photo-bg__img" src="gallery/cosplay-25-sm.jpg"></picture>
+    <picture><source srcset="gallery/cosplay-26.webp" type="image/webp"><img class="photo-bg__img" src="gallery/cosplay-26-sm.jpg"></picture>
+    <picture><source srcset="gallery/cosplay-27.webp" type="image/webp"><img class="photo-bg__img" src="gallery/cosplay-27-sm.jpg"></picture>
     <div class="photo-bg__overlay"></div>
   </div>
 
@@ -889,8 +892,31 @@
       const content = document.querySelector('.content');
       if (!pb || !hero) return;
       const vw = window.innerWidth;
-      const imgs = pb.querySelectorAll('.photo-bg__img');
+      const imgs = Array.from(pb.querySelectorAll('.photo-bg__img'));
       const isMobile = vw < 768;
+
+      // Mobile blacklist: cosplay-13(idx 12), 15(idx 14), 23(idx 22) -> 25,26,27
+      const MOBILE_BLACKLIST = [12, 14, 22];
+      const MOBILE_REPLACE = [24, 25, 26];
+      if (isMobile) {
+        MOBILE_BLACKLIST.forEach((blackIdx, i) => {
+          const replaceIdx = MOBILE_REPLACE[i];
+          if (imgs[blackIdx] && imgs[replaceIdx]) {
+            const src = imgs[replaceIdx].currentSrc || imgs[replaceIdx].src;
+            imgs[blackIdx].src = src;
+            const source = imgs[blackIdx].closest('picture')?.querySelector('source');
+            const replaceSource = imgs[replaceIdx].closest('picture')?.querySelector('source');
+            if (source && replaceSource) source.srcset = replaceSource.srcset;
+          }
+        });
+      }
+
+      // Shuffle
+      for (let i = imgs.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [imgs[i], imgs[j]] = [imgs[j], imgs[i]];
+      }
+
       const COLS = isMobile ? 6 : 8, ROWS = isMobile ? 4 : 3;
       const baseW = vw * 0.055;
       const baseH = baseW * 1.3;
