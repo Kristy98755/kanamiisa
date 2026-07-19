@@ -61,6 +61,7 @@ let totalNotes = 0, popups = [], particles = [];
 let holdActive = [], songTime = 0;
 let countdownTimer = 0, countdownValue = 0, bgDim = 0.3;
 let isAutoplay = false, songDuration = 0;
+let loadingMsg = '';
 let pauseState = null;
 let audioVolume = 1;
 let currentBreak = null;
@@ -158,6 +159,7 @@ loadTracks();
 
 function selectTrack(idx) {
   selectedTrack = tracks[idx];
+  loadingMsg = 'Загрузка...';
   fetch(`tracks/${selectedTrack.id}/data.json`).then(r => r.json()).then(data => {
     beatmap = data;
     if (beatmap.difficulties) {
@@ -172,10 +174,11 @@ function selectTrack(idx) {
       return (a.hitObjects?.length || 0) - (b.hitObjects?.length || 0);
     });
     selectedDiff = 0;
+    loadingMsg = '';
     state = 'MENU';
     setupKeys(beatmap.difficulties[0]?.difficulty?.CircleSize || 4);
     console.log(`Selected: ${data.artist} - ${data.title} (${beatmap.difficulties.length} diffs)`);
-  }).catch(e => console.error('Failed to load track data:', e));
+  }).catch(e => { loadingMsg = ''; console.error('Failed to load track data:', e); });
 }
 
 function loadAudio() {
@@ -345,7 +348,9 @@ function startGame() {
 }
 
 async function initGame() {
+  loadingMsg = 'Загрузка...';
   await Promise.all([loadAudio(), loadBG(), loadHitSounds()]);
+  loadingMsg = '';
   startGame();
 }
 
@@ -804,6 +809,20 @@ function drawMenu() {
   ctx.font = `${Math.min(15, W * 0.028)}px Inter, sans-serif`;
   ctx.fillText(beatmap.title + ' by ' + beatmap.artist, W / 2, H * 0.07);
 
+  const rankBtnW = Math.min(96, W * 0.22), rankBtnH = 30;
+  const rankBtnX = W - rankBtnW - 12, rankBtnY = 10;
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  roundRect(ctx, rankBtnX, rankBtnY, rankBtnW, rankBtnH, 8);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  roundRect(ctx, rankBtnX, rankBtnY, rankBtnW, rankBtnH, 8);
+  ctx.stroke();
+  ctx.fillStyle = '#ccc';
+  ctx.font = '13px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Рейтинг', rankBtnX + rankBtnW / 2, rankBtnY + 20);
+
   if (!beatmap) {
     ctx.fillStyle = '#aaa';
     ctx.font = '16px Inter, sans-serif';
@@ -865,21 +884,6 @@ function drawMenu() {
   ctx.fillStyle = '#0a0a12';
   ctx.font = 'bold 18px Inter, sans-serif';
   ctx.fillText('ИГРАТЬ', W / 2, btnY + 29);
-
-  const rankBtnY = btnY + 44 + 12;
-  const rankBtnW = Math.min(140, W * 0.35);
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.beginPath();
-  roundRect(ctx, W / 2 - rankBtnW / 2, rankBtnY, rankBtnW, 36, 8);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  roundRect(ctx, W / 2 - rankBtnW / 2, rankBtnY, rankBtnW, 36, 8);
-  ctx.stroke();
-  ctx.fillStyle = '#ccc';
-  ctx.font = '14px Inter, sans-serif';
-  ctx.fillText('Рейтинг', W / 2, rankBtnY + 23);
 }
 
 function drawCountdown() {
@@ -1190,7 +1194,7 @@ function drawResults() {
 
   ctx.fillStyle = '#666';
   ctx.font = `${Math.min(13, W * 0.026)}px Inter, sans-serif`;
-    ctx.fillText('Нажмите или Пробел для продолжения', W / 2, H * 0.93);
+    ctx.fillText('Тапните в любом месте или нажмите пробел для продолжения', W / 2, H * 0.93);
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -1259,7 +1263,16 @@ function draw() {
   else if (state === 'COUNTDOWN') drawCountdown();
   else if (state === 'PLAYING') drawPlaying();
   else if (state === 'RESULTS') drawResults();
-  else if (state === 'PAUSED') drawPauseOverlay();
+  else   if (state === 'PAUSED') drawPauseOverlay();
+
+  if (loadingMsg) {
+    ctx.fillStyle = 'rgba(10,10,18,0.75)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#19e6f5';
+    ctx.font = `bold ${Math.min(30, W * 0.055)}px Inter, sans-serif`;
+    ctx.fillText(loadingMsg, W / 2, H / 2);
+  }
 }
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
@@ -1342,9 +1355,9 @@ function handleClick(cx, cy) {
       initGame();
     }
 
-    const rankBtnY = btnY + 44 + 12;
-    const rankBtnW = Math.min(140, W * 0.35);
-    if (cx >= W / 2 - rankBtnW / 2 && cx <= W / 2 + rankBtnW / 2 && cy >= rankBtnY && cy <= rankBtnY + 36) {
+    const rankBtnW = Math.min(96, W * 0.22), rankBtnH = 30;
+    const rankBtnX = W - rankBtnW - 12, rankBtnY = 10;
+    if (cx >= rankBtnX && cx <= rankBtnX + rankBtnW && cy >= rankBtnY && cy <= rankBtnY + rankBtnH) {
       rankingOpen();
     }
   } else if (state === 'RESULTS') {
@@ -1356,10 +1369,39 @@ function handleClick(cx, cy) {
   }
 }
 
+let isPointerDown = false, pointerDownY = 0, lastPointerY = 0, pointerMoved = false;
+const TAP_THRESHOLD = 10;
+
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
-  handleClick(e.clientX, e.clientY);
+  isPointerDown = true;
+  pointerMoved = false;
+  pointerDownY = e.clientY;
+  lastPointerY = e.clientY;
 });
+
+canvas.addEventListener('pointermove', e => {
+  if (state === 'TRACK_SELECT') {
+    if (isPointerDown) {
+      const dy = lastPointerY - e.clientY;
+      if (Math.abs(e.clientY - pointerDownY) > TAP_THRESHOLD) pointerMoved = true;
+      trackScrollY += dy;
+      trackScrollVel = 0;
+      e.preventDefault();
+    }
+    lastPointerY = e.clientY;
+  }
+}, { passive: false });
+
+canvas.addEventListener('pointerup', e => {
+  isPointerDown = false;
+  const wasTap = !pointerMoved;
+  pointerMoved = false;
+  if (wasTap) handleClick(e.clientX, e.clientY);
+});
+
+canvas.addEventListener('pointercancel', () => { isPointerDown = false; pointerMoved = false; });
+canvas.addEventListener('pointerleave', () => { isPointerDown = false; });
 
 document.addEventListener('keydown', e => {
   if (e.repeat) return;
@@ -1412,7 +1454,6 @@ document.addEventListener('keyup', e => {
   }
 });
 
-let touchStartY = 0;
 canvas.addEventListener('wheel', e => {
   if (state === 'TRACK_SELECT') {
     trackScrollY += e.deltaY * 0.5;
@@ -1420,21 +1461,6 @@ canvas.addEventListener('wheel', e => {
     e.preventDefault();
   }
 }, { passive: false });
-
-canvas.addEventListener('touchstart', e => {
-  if (state === 'TRACK_SELECT' && e.touches.length === 1) {
-    touchStartY = e.touches[0].clientY;
-  }
-}, { passive: true });
-
-canvas.addEventListener('touchmove', e => {
-  if (state === 'TRACK_SELECT' && e.touches.length === 1) {
-    const dy = touchStartY - e.touches[0].clientY;
-    touchStartY = e.touches[0].clientY;
-    trackScrollY += dy;
-    trackScrollVel = 0;
-  }
-}, { passive: true });
 
 loop();
 </script>
