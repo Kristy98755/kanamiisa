@@ -82,7 +82,7 @@ let bestScore=parseInt(localStorage.getItem('hearts_best')||'0',10);
 
 function endGame(){
   running=false;cancelAnimationFrame(anim);clearInterval(spawnInt);
-  if(score>bestScore){bestScore=score;localStorage.setItem('hearts_best',bestScore);rankingSave(score);}
+  if(score>bestScore){bestScore=score;localStorage.setItem('hearts_best',bestScore);rankingSave();}
   document.getElementById('btn').textContent='Заново';
   ctx.fillStyle='#19e6f5';ctx.font='bold 28px Space Grotesk,sans-serif';ctx.textAlign='center';
   ctx.fillText(`Игра окончена! Счёт: ${score}`,canvas.width/2,canvas.height/2);

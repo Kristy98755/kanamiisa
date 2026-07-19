@@ -4,7 +4,7 @@
  *
  * Usage in game:
  *   rankingInit('flappy')   // or 'piano' or 'hearts'
- *   rankingSave(score)      // call when new best score
+ *   rankingSave()           // syncs all games' bests from localStorage
  *   rankingOpen()           // open leaderboard overlay
  */
 
@@ -29,11 +29,30 @@ function rankingInit(game) {
     RANKING_GAME = game;
 }
 
-async function rankingSave(score) {
+function getPianoAggregate() {
+    let total = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('mikupiano_') && k !== 'mikupiano_total') {
+            try {
+                const v = JSON.parse(localStorage.getItem(k));
+                if (v && typeof v.score === 'number') total += v.score;
+            } catch (e) {}
+        }
+    }
+    return total;
+}
+
+async function rankingSave() {
     if (!RANKING_ID || !RANKING_NAME) return;
 
-    const body = { id: RANKING_ID, name: RANKING_NAME };
-    body[RANKING_GAME + '_best'] = score;
+    const body = {
+        id: RANKING_ID,
+        name: RANKING_NAME,
+        flappy_best: parseInt(localStorage.getItem('flappy_best') || '0', 10) || 0,
+        piano_best: getPianoAggregate(),
+        hearts_best: parseInt(localStorage.getItem('hearts_best') || '0', 10) || 0
+    };
 
     try {
         await fetch('/api/rankings', {
@@ -51,8 +70,9 @@ function rankingSetName(name) {
     localStorage.setItem('ranking_name', name);
 }
 
-function rankingOpen() {
+async function rankingOpen() {
     if (RANKING_OVERLAY) return;
+    if (RANKING_ID && RANKING_NAME) await rankingSave();
     createOverlay();
     loadTop();
 }
@@ -130,7 +150,7 @@ function showNameInput(container) {
         const name = input.value.trim();
         if (!name) return;
         rankingSetName(name);
-        rankingSave(0);
+        rankingSave();
         container.innerHTML = '';
         createOverlay();
         loadTop();

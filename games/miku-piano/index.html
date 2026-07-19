@@ -487,7 +487,7 @@ function finishGame() {
     for (let i = 0; i < (beatmap?.difficulties?.length || 1); i++) {
       totalBest += getBestScore(i).score;
     }
-    rankingSave(totalBest);
+    rankingSave();
   }
   if (audio) { audio.pause(); audio.currentTime = 0; audio.volume = 1; }
   syncTouchLayer();

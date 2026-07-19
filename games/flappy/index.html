@@ -475,14 +475,14 @@ function saveBest() {
 function endGame() {
   state = 'GAMEOVER';
   gameOver = true;
-  if (score > bestScore) { bestScore = score; saveBest(); rankingSave(score); }
+  if (score > bestScore) { bestScore = score; saveBest(); rankingSave(); }
   stopAudio();
 }
 
 function finishSong() {
   state = 'CONFETTI';
   gameOver = true;
-  if (score > bestScore) { bestScore = score; saveBest(); rankingSave(score); }
+  if (score > bestScore) { bestScore = score; saveBest(); rankingSave(); }
   if (currentTrackIndex >= 0) {
     markCompleted(TRACKS[selectedRadio].file);
   }
