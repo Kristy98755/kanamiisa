@@ -1179,6 +1179,9 @@
       titleEl.textContent = title;
       overlay.classList.add('active');
       document.body.style.overflow = 'hidden';
+      document.querySelectorAll('.miku-note').forEach(n => n.style.display = 'none');
+      const mikuEgg = document.getElementById('mikuEgg');
+      if (mikuEgg) mikuEgg.style.display = 'none';
       frame.src = url;
       frame.onload = () => { try { frame.contentWindow.focus(); } catch(e) {} };
     }
@@ -1188,6 +1191,8 @@
       const frame = document.getElementById('gameOverlayFrame');
       overlay.classList.remove('active');
       document.body.style.overflow = '';
+      const mikuEgg = document.getElementById('mikuEgg');
+      if (mikuEgg) mikuEgg.style.display = '';
       setTimeout(() => { frame.src = 'about:blank'; }, 100);
     }
 
