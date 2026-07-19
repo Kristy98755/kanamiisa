@@ -739,7 +739,7 @@ function drawTrackSelect() {
     if (y + itemH - trackScrollY < listY - itemH || y - trackScrollY > H) continue;
 
     ctx.textAlign = 'left';
-    ctx.font = nameFont;
+    ctx.font = `bold ${Math.min(19, W * 0.039)}px Inter, sans-serif`;
     const full = t.title + ' by ' + t.artist;
     let line1 = full, line2 = '';
     if (ctx.measureText(full).width > maxNameW) {
