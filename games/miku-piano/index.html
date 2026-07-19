@@ -716,6 +716,8 @@ function drawTrackSelect() {
   ctx.fillText(`Сыграно: ${stats.songs}`, W / 2, H * 0.16);
 
   const listY = H * 0.2;
+  const maxNameW = W * 0.84;
+  const padBot = 8;
   const metaFont = `${Math.min(15, W * 0.030)}px Inter, sans-serif`;
 
   const trackHeights = getTrackHeights();
