@@ -141,5 +141,16 @@
     "bgFile": "tracks/hatsune-miku-megurine-luka-world-s-end-dancehall/bg.png",
     "diffCount": 4,
     "totalNotes": 1735
+  },
+  {
+    "id": "anythingbecomemoe-yararara-feat-kasane-teto-sv2",
+    "title": "YARARARA / feat. Kasane Teto SV2",
+    "titleUnicode": "ヤラララ / feat. 重音テト SV2",
+    "artist": "AnythingBecomeMoe",
+    "artistUnicode": "AnythingBecomeMoe",
+    "audioFile": "tracks/anythingbecomemoe-yararara-feat-kasane-teto-sv2/audio.mp3",
+    "bgFile": "tracks/anythingbecomemoe-yararara-feat-kasane-teto-sv2/bg.png",
+    "diffCount": 5,
+    "totalNotes": 4221
   }
 ]
