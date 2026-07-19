@@ -1202,6 +1202,15 @@
       }
     });
 
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (document.getElementById('gameOverlay').classList.contains('active')) {
+          closeGame();
+        }
+        if (window.__mikuBeamAudio) { try { window.__mikuBeamAudio.pause(); } catch (e) {} }
+      }
+    });
+
     window.addEventListener('message', e => {
       if (e.data === 'closeGame' && document.getElementById('gameOverlay').classList.contains('active')) {
         closeGame();
@@ -1287,6 +1296,7 @@
       try {
         const audio = new Audio('games/miku_beam.mp3');
         audio.volume = 0.6;
+        window.__mikuBeamAudio = audio;
         audio.play().catch(() => {});
       } catch (e) {}
     }
