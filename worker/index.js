@@ -15,6 +15,7 @@ import {
     webauthnLoginBegin, webauthnLoginFinish,
     webauthnList, webauthnDelete
 } from './webauthn.js';
+import { rankingsFetch } from './rankings.js';
 
 export default {
     async fetch(request, env) {
@@ -160,6 +161,11 @@ export default {
 
             // Static files
             return serveFile(env, path.slice(1));
+        }
+
+        // === Rankings routes ===
+        if (path.startsWith('/api/rankings')) {
+            return rankingsFetch(request, env);
         }
 
         // === Mail routes (auth-gated via session system) ===

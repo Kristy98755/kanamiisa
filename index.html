@@ -2,6 +2,12 @@
 <html lang="ru" data-theme="d">
 
 <head>
+  <script>
+  try {
+    const _dummy = { metadata: null, setActionHandler() {}, setMicrophoneActivationState() {} };
+    Object.defineProperty(Navigator.prototype, 'mediaSession', { get() { return _dummy; }, configurable: true });
+  } catch(e) {}
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kanami-isa</title>
@@ -554,50 +560,114 @@
       height: 60px;
     }
 
-    .minigame-section {
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
       margin-bottom: 60px;
-      padding: 40px;
-      border-radius: 20px;
+    }
+
+    .games-grid .card {
+      padding: 28px 20px;
+      border-radius: 16px;
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       text-align: center;
+      cursor: pointer;
+      transition: all 0.25s;
+      text-decoration: none;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
     }
 
-    .minigame-canvas {
-      width: 100%;
-      max-width: 600px;
-      height: 300px;
-      border-radius: 12px;
-      background: var(--bg);
-      border: 1px solid var(--card-border);
-      margin: 20px auto;
-      display: block;
+    .games-grid .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+      box-shadow: 0 0 24px var(--glow-soft), 0 8px 32px rgba(0,0,0,0.4);
     }
 
-    .minigame-btn {
-      padding: 12px 32px;
-      border-radius: 10px;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      font-size: 14px;
+    .games-grid .card-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      background: rgba(25,230,245,0.1);
+      border: 1px solid rgba(25,230,245,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s;
+    }
+
+    .games-grid .card:hover .card-icon {
+      background: rgba(25,230,245,0.18);
+      box-shadow: 0 0 20px var(--glow-soft);
+    }
+
+    .games-grid .card-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px;
       font-weight: 600;
+      color: var(--text);
+    }
+
+    @media (max-width: 600px) {
+      .games-grid { grid-template-columns: 1fr; gap: 12px; }
+    }
+
+    .game-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: var(--bg);
+      display: none;
+      flex-direction: column;
+    }
+
+    .game-overlay.active {
+      display: flex;
+    }
+
+    .game-overlay-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--card-border);
+      flex-shrink: 0;
+    }
+
+    .game-overlay-bar button {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
       cursor: pointer;
       transition: all 0.2s;
-      font-family: 'Inter', sans-serif;
     }
 
-    .minigame-btn:hover {
-      opacity: 0.85;
-      transform: scale(1.02);
+    .game-overlay-bar button:hover {
+      background: rgba(255,255,255,0.14);
     }
 
-    .minigame-score {
+    .game-overlay-bar span {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 28px;
-      font-weight: 700;
+      font-size: 14px;
+      font-weight: 600;
       color: var(--accent);
-      margin-bottom: 12px;
+    }
+
+    .game-overlay iframe {
+      flex: 1;
+      width: 100%;
+      border: none;
+      background: #0a0a12;
     }
 
     .miku-overlay {
@@ -619,22 +689,29 @@
 
     .miku-note {
       position: fixed;
-      font-size: 24px;
+      font-size: 48px;
+      padding: 20px;
+      margin: -20px;
+      cursor: pointer;
       opacity: 0;
-      pointer-events: none;
       z-index: 9998;
-      animation: floatNote 3s ease-out forwards;
+      animation: floatNote 4s ease-out forwards;
+      transition: transform 0.15s;
+    }
+
+    .miku-note:hover {
+      transform: scale(1.3);
     }
 
     @keyframes floatNote {
       0% {
-        opacity: 0.8;
+        opacity: 0.9;
         transform: translateY(0) rotate(0deg);
       }
 
       100% {
         opacity: 0;
-        transform: translateY(-200px) rotate(40deg);
+        transform: translateY(-250px) rotate(40deg);
       }
     }
 
@@ -865,15 +942,47 @@
       </div>
     </div>
 
-    <div class="minigame-section" id="minigameSection">
-      <h2 class="section-title" style="border-left:none;text-align:center;padding-left:0">Мини-игра</h2>
-      <p style="color:var(--text-dim);font-size:14px;margin-bottom:16px">Поймай падающие сердечки. Пропущенные — минус
-        жизнь.</p>
-      <div class="minigame-score" id="scoreDisplay">0</div>
-      <canvas class="minigame-canvas" id="gameCanvas"></canvas>
-      <br>
-      <button class="minigame-btn" id="gameBtn" onclick="startGame()">Играть</button>
+    <h2 class="section-title">Мини-игры</h2>
+    <div class="games-grid">
+      <a class="card" onclick="openGame('games/flappy/index.html','Flappy Miku')">
+        <div class="card-icon">
+          <svg width="30" height="30" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <g transform="translate(0,1024) scale(0.1,-0.1)" fill="#19e6f5" stroke="none">
+              <path d="M2680 9301 c-80 -42 -94 -97 -88 -346 l3 -160 -105 -55 c-453 -241 -810 -620 -1083 -1152 -137 -268 -263 -586 -484 -1228 -89 -260 -202 -575 -419 -1180 -403 -1117 -523 -1611 -500 -2062 24 -492 181 -898 482 -1248 457 -530 1079 -823 1934 -912 191 -19 698 -17 830 5 168 27 279 57 366 97 96 44 150 90 190 162 27 49 29 61 29 153 0 93 -3 105 -34 170 -30 61 -56 91 -205 235 -305 294 -477 473 -571 590 -206 256 -355 524 -445 798 -47 142 -100 365 -100 418 0 25 2 24 63 -25 34 -28 110 -87 168 -131 118 -89 109 -77 305 -440 154 -287 189 -344 230 -372 55 -39 127 -50 270 -43 l121 7 24 -43 c37 -67 73 -86 182 -94 50 -4 193 -4 316 -1 217 6 226 7 262 30 60 40 72 85 67 262 -3 168 -13 197 -78 237 -33 21 -49 22 -277 25 -133 2 -279 -1 -325 -6 -81 -10 -84 -11 -125 -56 l-41 -46 -95 0 c-77 0 -97 3 -109 18 -17 19 -209 364 -205 368 1 2 45 -13 97 -33 52 -19 136 -45 185 -56 89 -21 112 -21 1560 -25 1012 -2 1500 0 1565 8 129 14 266 53 378 106 100 47 162 88 255 171 33 29 63 51 67 48 5 -3 31 -9 58 -15 77 -14 163 3 267 54 49 25 92 43 94 40 10 -10 -46 -255 -90 -387 -132 -405 -348 -737 -719 -1107 -113 -113 -258 -254 -322 -315 -173 -165 -235 -279 -225 -417 14 -213 187 -324 594 -385 168 -24 658 -24 868 0 482 57 766 138 1158 329 318 156 629 418 836 707 406 565 482 1229 241 2096 -49 174 -174 557 -265 809 -346 960 -481 1339 -531 1491 -32 100 -185 523 -229 635 -119 303 -271 624 -380 800 -70 113 -205 294 -303 405 -158 180 -423 388 -644 505 l-47 24 -3 228 c-3 252 -4 255 -78 306 -32 22 -39 22 -325 22 -286 0 -293 0 -325 -22 -62 -43 -70 -72 -70 -265 0 -95 -2 -173 -5 -173 -3 0 -36 15 -73 34 -260 131 -623 256 -912 315 -346 70 -720 95 -1055 71 -474 -36 -923 -155 -1352 -361 -56 -27 -104 -49 -107 -49 -3 0 -6 81 -8 179 -3 200 -8 215 -78 252 -31 17 -61 19 -315 19 -254 0 -284 -2 -315 -19z m2793 -346 c273 -30 470 -72 727 -157 381 -125 684 -287 980 -525 528 -423 885 -997 1065 -1712 75 -298 99 -492 98 -791 -1 -230 -17 -379 -69 -617 -83 -388 -281 -802 -523 -1102 -70 -87 -186 -199 -196 -190 -2 2 3 27 10 56 67 260 27 669 -105 1063 -86 259 -201 498 -348 725 -206 318 -624 773 -805 875 -59 33 -67 35 -157 35 -84 0 -102 -3 -151 -28 -87 -42 -132 -99 -211 -266 -216 -453 -401 -922 -503 -1276 -20 -71 -41 -134 -46 -139 -10 -12 -225 204 -313 314 -232 291 -432 680 -545 1059 -42 137 -46 146 -96 200 -62 66 -128 94 -222 94 -120 0 -169 -31 -357 -224 -580 -595 -937 -1263 -1017 -1903 -15 -126 -6 -425 16 -515 8 -35 14 -66 12 -68 -8 -7 -176 177 -248 272 -105 140 -179 264 -269 445 -155 316 -247 632 -281 958 -30 297 14 745 107 1074 32 115 123 372 168 478 71 162 238 454 335 585 21 28 64 86 97 129 84 112 327 361 453 462 478 385 1093 632 1727 693 153 14 513 12 667 -4z m-2873 -604 l0 -89 -100 -116 c-149 -173 -213 -257 -304 -395 -285 -434 -481 -941 -561 -1455 -89 -576 -42 -1037 164 -1596 42 -112 194 -419 269 -543 l59 -98 6 -187 c13 -455 158 -953 390 -1336 197 -326 374 -531 870 -1001 112 -106 143 -153 120 -176 -18 -18 -122 -49 -240 -71 -108 -21 -146 -23 -438 -23 -274 1 -344 4 -485 23 -539 73 -1008 248 -1314 492 -102 81 -258 232 -326 315 -186 227 -297 463 -362 763 -20 95 -23 134 -23 342 1 173 5 266 18 350 53 345 194 803 542 1760 72 198 207 578 255 720 235 693 353 1012 463 1250 235 510 495 837 858 1078 67 45 126 82 131 82 4 0 8 -40 8 -89z m5357 -129 c288 -236 542 -606 738 -1077 101 -242 197 -508 445 -1230 60 -176 69 -200 275 -770 291 -804 402 -1165 471 -1540 49 -262 44 -595 -11 -830 -99 -420 -377 -802 -781 -1075 -414 -280 -1027 -440 -1680 -440 -322 0 -604 41 -675 99 l-22 18 22 36 c12 20 93 103 179 184 363 341 531 527 707 787 152 224 290 514 368 776 67 222 114 513 118 723 l3 109 54 86 c168 264 318 615 396 928 66 262 97 515 96 799 0 443 -89 893 -264 1331 -161 406 -365 742 -615 1014 l-83 90 -4 75 c-3 42 -2 80 1 85 8 13 126 -68 262 -178z m-1735 -1974 c105 -87 304 -295 415 -433 407 -507 625 -1062 627 -1600 1 -166 -12 -231 -64 -340 -86 -179 -228 -294 -447 -362 l-88 -28 -1515 0 -1515 0 -88 22 c-288 74 -460 248 -523 529 -14 63 -16 109 -11 253 13 428 149 807 453 1266 142 214 270 371 472 578 l115 118 52 -158 c67 -200 90 -261 155 -403 158 -347 357 -637 610 -891 172 -173 231 -209 353 -217 87 -5 140 8 203 51 68 45 110 105 134 190 44 156 174 540 234 692 135 341 335 785 355 785 5 0 38 -23 73 -52z"/>
+              <path d="M3925 5323 c-28 -10 -67 -31 -87 -47 -72 -55 -150 -204 -128 -246 5 -10 55 -51 110 -91 55 -40 100 -75 100 -78 0 -3 -43 -35 -95 -70 -123 -84 -129 -91 -120 -138 19 -103 111 -225 198 -263 218 -97 437 133 437 460 0 210 -80 383 -209 454 -67 36 -139 43 -206 19z"/>
+              <path d="M6086 5324 c-109 -34 -250 -238 -208 -300 4 -6 53 -45 110 -87 l103 -76 -67 -48 c-144 -102 -149 -107 -152 -142 -5 -54 57 -169 124 -230 60 -55 101 -71 183 -71 135 0 256 123 307 310 22 80 24 252 5 330 -32 131 -118 258 -205 302 -52 27 -138 32 -200 12z"/>
+            </g>
+          </svg>
+        </div>
+        <div class="card-title">Flappy Miku</div>
+      </a>
+      <a class="card" onclick="openGame('games/miku-piano/index.html','Miku Piano')">
+        <div class="card-icon">
+          <svg width="30" height="30" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#19e6f5" d="M505.239,200.77c-7.154-24.514-20.861-49.314-44.076-67.913c-23.168-18.646-55.452-30.354-96.99-30.284c-13.176,0-23.761-1.469-32.553-3.853c-15.345-4.224-25.56-11.023-35.445-19.992c-7.361-6.722-14.33-14.776-22.168-23.407c-11.731-12.884-25.699-27.176-46.298-37.83C207.109,6.8,180.494,0.146,144.404,0.176C64.644,0.184,0.007,64.821,0,144.58v155.519v36.783v113.389c0.007,33.999,27.545,61.536,61.56,61.552H450.44c34.015-0.016,61.552-27.554,61.56-61.552V336.882v-88.328C511.992,233.531,510.031,217.155,505.239,200.77z M124.542,480.317H61.56c-8.353-0.008-15.769-3.339-21.253-8.8c-5.462-5.492-8.793-12.9-8.8-21.246V336.882v-23.207h65.22v98.328c0,7.7,6.246,13.962,13.954,13.962h13.862V480.317z M248.908,480.317h-110.19v-54.352h15.453c7.708,0,13.954-6.261,13.954-13.962v-98.328h52.968v98.328c0,7.7,6.246,13.962,13.954,13.962h13.862V480.317z M373.281,480.317h-110.19v-54.352h15.454c7.699,0,13.946-6.261,13.946-13.962v-98.328h52.975v98.328c0,7.7,6.246,13.962,13.946,13.962h13.868V480.317z M480.493,336.882v113.389c-0.008,8.346-3.338,15.753-8.8,21.246c-5.484,5.461-12.9,8.792-21.253,8.8h-62.983v-54.352h15.461c7.707,0,13.954-6.261,13.954-13.962v-98.328h63.621V336.882z"/>
+          </svg>
+        </div>
+        <div class="card-title">Miku Piano</div>
+      </a>
+      <a class="card" onclick="openGame('games/hearts/index.html','Сердечки')">
+        <div class="card-icon">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#19e6f5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+          </svg>
+        </div>
+        <div class="card-title">Сердечки</div>
+      </a>
     </div>
+
+    <div class="game-overlay" id="gameOverlay">
+      <div class="game-overlay-bar">
+        <button onclick="closeGame()">&larr; Назад</button>
+        <span id="gameOverlayTitle"></span>
+      </div>
+      <iframe id="gameOverlayFrame" src="about:blank" allow="autoplay; encrypted-media"></iframe>
+    </div>
+
+
 
     <div class="footer">
       KANAMI-ISA &copy; 2024 &middot; <a href="mailto:support@kanamiisa.uk" style="color:var(--accent);text-decoration:none">support@kanamiisa.uk</a>
@@ -1057,112 +1166,42 @@
       orbs[2].style.transform = `translate(${pct * 100}px, ${-pct * 120}px) scale(${1 + pct * 0.5})`;
     });
 
-    // ===== MINI-GAME =====
-    let gameRunning = false;
-    let gameScore = 0;
-    let gameLives = 3;
-    let gameItems = [];
-    let gameAnim;
+    // ===== GAME OVERLAY =====
+    window.gamemode = {
+      c() { try { document.getElementById('gameOverlayFrame').contentWindow.gamemode.c(); } catch(e) {} },
+      s() { try { document.getElementById('gameOverlayFrame').contentWindow.gamemode.s(); } catch(e) {} }
+    };
 
-    const gameCanvas = document.getElementById('gameCanvas');
-    const gameCtx = gameCanvas.getContext('2d');
-
-    function resizeGame() {
-      const rect = gameCanvas.getBoundingClientRect();
-      gameCanvas.width = rect.width;
-      gameCanvas.height = rect.height;
+    function openGame(url, title) {
+      const overlay = document.getElementById('gameOverlay');
+      const frame = document.getElementById('gameOverlayFrame');
+      const titleEl = document.getElementById('gameOverlayTitle');
+      titleEl.textContent = title;
+      overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      frame.src = url;
+      frame.onload = () => { try { frame.contentWindow.focus(); } catch(e) {} };
     }
-    resizeGame();
-    window.addEventListener('resize', resizeGame);
 
-    gameCanvas.addEventListener('click', e => {
-      if (!gameRunning) return;
-      const rect = gameCanvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+    function closeGame() {
+      const overlay = document.getElementById('gameOverlay');
+      const frame = document.getElementById('gameOverlayFrame');
+      overlay.classList.remove('active');
+      document.body.style.overflow = '';
+      setTimeout(() => { frame.src = 'about:blank'; }, 100);
+    }
 
-      for (let i = gameItems.length - 1; i >= 0; i--) {
-        const item = gameItems[i];
-        const dx = x - item.x;
-        const dy = y - item.y;
-        if (Math.sqrt(dx * dx + dy * dy) < item.r + 10) {
-          if (item.type === 'heart') {
-            gameScore += 10;
-          } else {
-            gameLives--;
-          }
-          gameItems.splice(i, 1);
-          document.getElementById('scoreDisplay').textContent = gameScore;
-          if (gameLives <= 0) endGame();
-          break;
-        }
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('gameOverlay').classList.contains('active')) {
+        closeGame();
       }
     });
 
-    function spawnItem() {
-      if (!gameRunning) return;
-      const isHeart = Math.random() < 0.7;
-      gameItems.push({
-        x: Math.random() * (gameCanvas.width - 40) + 20,
-        y: -20,
-        r: 16,
-        type: isHeart ? 'heart' : 'bomb',
-        speed: Math.random() * 2 + 1.5,
-        emoji: isHeart ? '❤️' : '💣'
-      });
-    }
-
-    function drawGame() {
-      gameCtx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
-
-      for (let i = gameItems.length - 1; i >= 0; i--) {
-        const item = gameItems[i];
-        item.y += item.speed;
-
-        if (item.y > gameCanvas.height + 20) {
-          if (item.type === 'heart') gameLives--;
-          gameItems.splice(i, 1);
-          document.getElementById('scoreDisplay').textContent = gameScore;
-          if (gameLives <= 0) { endGame(); return; }
-          continue;
-        }
-
-        gameCtx.font = `${item.r * 2}px serif`;
-        gameCtx.textAlign = 'center';
-        gameCtx.textBaseline = 'middle';
-        gameCtx.fillText(item.emoji, item.x, item.y);
+    window.addEventListener('message', e => {
+      if (e.data === 'closeGame' && document.getElementById('gameOverlay').classList.contains('active')) {
+        closeGame();
       }
-
-      gameCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim();
-      gameCtx.font = '14px Inter, sans-serif';
-      gameCtx.textAlign = 'left';
-      gameCtx.fillText('❤️'.repeat(gameLives), 12, gameCanvas.height - 12);
-
-      if (gameRunning) gameAnim = requestAnimationFrame(drawGame);
-    }
-
-    function startGame() {
-      gameRunning = true;
-      gameScore = 0;
-      gameLives = 3;
-      gameItems = [];
-      document.getElementById('scoreDisplay').textContent = '0';
-      document.getElementById('gameBtn').textContent = 'Играем!';
-      resizeGame();
-      drawGame();
-      gameInterval = setInterval(spawnItem, 600);
-    }
-
-    function endGame() {
-      gameRunning = false;
-      cancelAnimationFrame(gameAnim);
-      clearInterval(gameInterval);
-      document.getElementById('gameBtn').textContent = 'Заново';
-      gameCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-      gameCtx.font = 'bold 28px Space Grotesk, sans-serif';
-      gameCtx.textAlign = 'center';
-      gameCtx.fillText(`Игра окончена! Счёт: ${gameScore}`, gameCanvas.width / 2, gameCanvas.height / 2);
-    }
+    });
 
     // ===== MIKU EASTER EGG (visible ♪ button, bottom-left) =====
     let mikuClicks = 0;
@@ -1177,15 +1216,31 @@
           mikuClicks = 0;
           document.querySelector('.miku-overlay')?.classList.add('show');
 
+          if (typeof confetti === 'function') {
+            const colors = ['#19e6f5', '#ff7ac4', '#fff'];
+            const burst = (duration) => {
+              const end = performance.now() + duration;
+              const iv = setInterval(() => {
+                confetti({ particleCount: 8, spread: 80, origin: { x: 0.1, y: 0.85 }, colors });
+                confetti({ particleCount: 8, spread: 80, origin: { x: 0.9, y: 0.85 }, colors });
+                if (performance.now() >= end) clearInterval(iv);
+              }, 100);
+            };
+            burst(500);
+            setTimeout(() => burst(500), 500);
+            setTimeout(() => burst(3700), 1000);
+          }
+          playMikuBeam();
+
           for (let i = 0; i < 8; i++) {
             const note = document.createElement('div');
             note.className = 'miku-note';
             note.textContent = '♪';
-            note.style.left = Math.random() * 100 + 'vw';
-            note.style.top = Math.random() * 60 + 20 + 'vh';
+            note.style.left = Math.random() * 80 + 10 + 'vw';
+            note.style.top = Math.random() * 50 + 25 + 'vh';
             note.style.animationDelay = Math.random() * 0.5 + 's';
             document.body.appendChild(note);
-            setTimeout(() => note.remove(), 3500);
+            setTimeout(() => note.remove(), 4500);
           }
         }
       });
@@ -1219,6 +1274,16 @@
       } catch (e) {
         console.warn('QR generation failed:', e);
       }
+    }
+  </script>
+  <script src="confetti.min.js"></script>
+  <script>
+    function playMikuBeam() {
+      try {
+        const audio = new Audio('games/miku_beam.mp3');
+        audio.volume = 0.6;
+        audio.play().catch(() => {});
+      } catch (e) {}
     }
   </script>
 </body>

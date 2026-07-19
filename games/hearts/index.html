@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Сердечки</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#07070b;font-family:'Inter','Segoe UI',sans-serif;color:#f3f8f9}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 16px}
+canvas{display:block;touch-action:manipulation;width:100%;max-width:500px;aspect-ratio:3/2;border-radius:12px;background:#0f0f16;border:1px solid rgba(255,255,255,0.1)}
+.info{font-size:14px;color:#7d8f93;margin-bottom:12px}
+.score{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:#19e6f5;margin-bottom:8px}
+.btn{padding:10px 28px;border-radius:10px;background:#19e6f5;color:#07070b;border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;margin-top:12px}
+.btn:hover{opacity:0.85}
+.btn-sec{padding:8px 18px;border-radius:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#ccc;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;margin-top:10px}
+.btn-sec:hover{background:rgba(255,255,255,0.14)}
+</style>
+</head>
+<body>
+<div class="info">Поймай падающие сердечки. Пропущенные — минус жизнь.</div>
+<div class="score" id="score">0</div>
+<canvas id="c"></canvas>
+<button class="btn" id="btn" onclick="startGame()">Играть</button>
+<button class="btn-sec" onclick="rankingOpen()">Рейтинг</button>
+<script src="../ranking.js"></script>
+<script>
+rankingInit('hearts');
+
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+let running=false,score=0,lives=3,items=[],anim,spawnInt;
+
+function resize(){const r=canvas.getBoundingClientRect();canvas.width=r.width;canvas.height=r.height}
+resize();window.addEventListener('resize',resize);
+
+canvas.addEventListener('click',e=>{
+  if(!running)return;
+  const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+  for(let i=items.length-1;i>=0;i--){
+    const it=items[i],dx=x-it.x,dy=y-it.y;
+    if(Math.sqrt(dx*dx+dy*dy)<it.r+10){
+      if(it.type==='heart')score++;else lives--;
+      items.splice(i,1);
+      document.getElementById('score').textContent=score;
+      if(lives<=0)endGame();
+      break;
+    }
+  }
+});
+
+function spawn(){
+  if(!running)return;
+  const isH=Math.random()<0.7;
+  items.push({x:Math.random()*(canvas.width-40)+20,y:-20,r:16,type:isH?'heart':'bomb',speed:Math.random()*2+1.5,emoji:isH?'\u2764\uFE0F':'\uD83D\uDCA3'});
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let i=items.length-1;i>=0;i--){
+    const it=items[i];it.y+=it.speed;
+    if(it.y>canvas.height+20){
+      if(it.type==='heart')lives--;
+      items.splice(i,1);document.getElementById('score').textContent=score;
+      if(lives<=0){endGame();return;}continue;
+    }
+    ctx.font=`${it.r*2}px serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(it.emoji,it.x,it.y);
+  }
+  ctx.fillStyle='#7d8f93';ctx.font='14px Inter,sans-serif';ctx.textAlign='left';
+  ctx.fillText('\u2764\uFE0F'.repeat(lives),12,canvas.height-12);
+  if(running)anim=requestAnimationFrame(draw);
+}
+
+function startGame(){
+  running=true;score=0;lives=3;items=[];
+  document.getElementById('score').textContent='0';
+  document.getElementById('btn').textContent='Играем!';
+  resize();draw();spawnInt=setInterval(spawn,600);
+}
+
+let bestScore=parseInt(localStorage.getItem('hearts_best')||'0',10);
+
+function endGame(){
+  running=false;cancelAnimationFrame(anim);clearInterval(spawnInt);
+  if(score>bestScore){bestScore=score;localStorage.setItem('hearts_best',bestScore);rankingSave(score);}
+  document.getElementById('btn').textContent='Заново';
+  ctx.fillStyle='#19e6f5';ctx.font='bold 28px Space Grotesk,sans-serif';ctx.textAlign='center';
+  ctx.fillText(`Игра окончена! Счёт: ${score}`,canvas.width/2,canvas.height/2);
+}
+</script>
+</body>
+</html>
