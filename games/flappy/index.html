@@ -118,6 +118,7 @@ const NOTE_MIN_GAP = 12;
 const NOTE_MAX_GAP = 24;
 const BASE_SPEED = 2.2;
 const ACCEL = 0.0004;
+const BIRD_VMAX = 5;
 const NOTE_W = 50;
 const AUTOPILOT_SECONDS = 15;
 const CLEAR_SECONDS = 5;
@@ -236,15 +237,24 @@ function getGapSize() {
 }
 
 function spawnNote(topOverride, gapOverride) {
-  let top, gapPx;
+  const gapPx = gapOverride !== undefined ? gapOverride : getGapSize();
+  let top;
   if (topOverride !== undefined) {
     top = topOverride;
-    gapPx = gapOverride !== undefined ? gapOverride : H;
   } else {
-    gapPx = getGapSize();
     const minTop = KEY_H + 20;
     const maxTop = H - KEY_H - gapPx - 20;
-    top = minTop + Math.random() * Math.max(0, maxTop - minTop);
+    const lo = minTop + gapPx / 2, hi = maxTop + gapPx / 2;
+    let center = lo + Math.random() * Math.max(0, hi - lo);
+    if (notes.length) {
+      const prev = notes[notes.length - 1];
+      const prevCenter = prev.top + prev.gap / 2;
+      const interval = Math.max(1, Math.floor(90 / (speed / BASE_SPEED)));
+      const maxDelta = BIRD_VMAX * interval;
+      center = prevCenter + (Math.random() * 2 - 1) * maxDelta;
+      center = Math.max(lo, Math.min(hi, center));
+    }
+    top = center - gapPx / 2;
   }
   const noteTypes = ['♩', '♪', '♫', '♬'];
   const noteType = noteTypes[Math.floor(Math.random() * noteTypes.length)];
@@ -361,10 +371,7 @@ function update() {
         const normalGap = getGapSize();
         const maxGap = H - KEY_H * 2;
         const gapSize = normalGap + (maxGap - normalGap) * progress;
-        const minTop = KEY_H;
-        const maxTop = H - KEY_H - gapSize;
-        const topY = minTop + Math.random() * Math.max(0, maxTop - minTop);
-        spawnNote(topY, gapSize);
+        spawnNote(undefined, gapSize);
       }
     }
 
