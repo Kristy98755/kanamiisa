@@ -89,9 +89,40 @@ function createOverlay() {
     title.style.cssText = 'font-size:20px;font-weight:700;color:#19e6f5;margin-bottom:16px;text-align:center';
     title.textContent = 'Рейтинг';
 
+    const tabs = document.createElement('div');
+    tabs.style.cssText = 'display:flex;gap:6px;margin-bottom:14px';
+    const tabGames = [['flappy', 'Flappy'], ['piano', 'Piano'], ['hearts', 'Hearts']];
+    const tabBtns = {};
+    tabGames.forEach(([g, label]) => {
+        const t = document.createElement('button');
+        t.textContent = label;
+        t.style.cssText = 'flex:1;padding:7px 0;border-radius:8px;font-size:13px;cursor:pointer;font-family:Inter,sans-serif;border:1px solid rgba(255,255,255,0.15)';
+        const active = g === RANKING_GAME;
+        t.style.background = active ? '#19e6f5' : 'rgba(255,255,255,0.05)';
+        t.style.color = active ? '#0a0a12' : '#ccc';
+        t.style.fontWeight = active ? '600' : '400';
+        t.style.borderColor = active ? '#19e6f5' : 'rgba(255,255,255,0.15)';
+        t.onclick = () => {
+            RANKING_GAME = g;
+            Object.values(tabBtns).forEach(b => {
+                b.style.background = 'rgba(255,255,255,0.05)';
+                b.style.color = '#ccc';
+                b.style.fontWeight = '400';
+                b.style.borderColor = 'rgba(255,255,255,0.15)';
+            });
+            t.style.background = '#19e6f5';
+            t.style.color = '#0a0a12';
+            t.style.fontWeight = '600';
+            t.style.borderColor = '#19e6f5';
+            loadTop();
+        };
+        tabBtns[g] = t;
+        tabs.appendChild(t);
+    });
+
     const topList = document.createElement('div');
     topList.id = 'ranking-top-list';
-    topList.style.cssText = 'margin-bottom:16px';
+    topList.style.cssText = 'margin-bottom:16px;max-height:50vh;overflow-y:auto';
 
     const nameSection = document.createElement('div');
     nameSection.style.cssText = 'border-top:1px solid rgba(255,255,255,0.08);padding-top:14px;text-align:center';
@@ -122,6 +153,7 @@ function createOverlay() {
 
     box.appendChild(closeBtn);
     box.appendChild(title);
+    box.appendChild(tabs);
     box.appendChild(topList);
     box.appendChild(nameSection);
     overlay.appendChild(box);

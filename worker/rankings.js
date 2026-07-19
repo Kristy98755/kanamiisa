@@ -13,6 +13,13 @@ export async function rankingsFetch(request, env) {
         return handleUpsert(request, env);
     }
 
+    // GET /api/rankings/top?game=flappy|piano|hearts — top 10
+    // Must be checked BEFORE the generic /:id route, otherwise "top" is
+    // captured as an id and misrouted to handleGet.
+    if (method === 'GET' && path === '/api/rankings/top') {
+        return handleTop(url, env);
+    }
+
     // GET /api/rankings/:id — get own record
     const getMatch = path.match(/^\/api\/rankings\/([^/]+)$/);
     if (method === 'GET' && getMatch) {
@@ -22,11 +29,6 @@ export async function rankingsFetch(request, env) {
     // PUT /api/rankings/:id — change name (new id generated)
     if (method === 'PUT' && getMatch) {
         return handleRename(getMatch[1], request, env);
-    }
-
-    // GET /api/rankings/top?game=flappy|piano|hearts — top 10
-    if (method === 'GET' && path === '/api/rankings/top') {
-        return handleTop(url, env);
     }
 
     return new Response('Not Found', { status: 404 });
