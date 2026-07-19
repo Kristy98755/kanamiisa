@@ -679,6 +679,18 @@ function pluralizeDiff(n) {
   return 'уровней сложности';
 }
 
+function getTrackHeights() {
+  const padBot = 8;
+  const maxNameW = W * 0.84;
+  const nameFont = `bold ${Math.min(19, W * 0.039)}px Inter, sans-serif`;
+  ctx.font = nameFont;
+  return tracks.map(t => {
+    const name = t.title + ' by ' + t.artist;
+    const wrapped = ctx.measureText(name).width > maxNameW;
+    return (wrapped ? 66 : 50) + padBot;
+  });
+}
+
 function drawTrackSelect() {
   ctx.fillStyle = '#0a0a12';
   ctx.fillRect(0, 0, W, H);
@@ -704,17 +716,9 @@ function drawTrackSelect() {
   ctx.fillText(`Сыграно: ${stats.songs}`, W / 2, H * 0.16);
 
   const listY = H * 0.2;
-  const padBot = 8;
-  const maxNameW = W * 0.84;
-  const nameFont = `bold ${Math.min(19, W * 0.039)}px Inter, sans-serif`;
   const metaFont = `${Math.min(15, W * 0.030)}px Inter, sans-serif`;
 
-  ctx.font = nameFont;
-  const trackHeights = tracks.map(t => {
-    const name = t.title + ' by ' + t.artist;
-    const wrapped = ctx.measureText(name).width > maxNameW;
-    return (wrapped ? 66 : 50) + padBot;
-  });
+  const trackHeights = getTrackHeights();
   const totalH = trackHeights.reduce((s, h) => s + h, 0);
   const maxScroll = Math.max(0, totalH - (H * 0.75));
   trackScrollY = Math.max(0, Math.min(maxScroll, trackScrollY));
@@ -1303,12 +1307,7 @@ function handleClick(cx, cy) {
   if (state === 'TRACK_SELECT') {
     if (!tracks.length) return;
     const listY = H * 0.2;
-    const maxNameW = W * 0.84;
-    ctx.font = `bold ${Math.min(14, W * 0.028)}px Inter, sans-serif`;
-    const trackHeights = tracks.map(t => {
-      const name = t.title + ' by ' + t.artist;
-      return (ctx.measureText(name).width > maxNameW ? 56 : 40) + 8;
-    });
+    const trackHeights = getTrackHeights();
     let curY = 0;
     for (let i = 0; i < tracks.length; i++) {
       const itemH = trackHeights[i];
