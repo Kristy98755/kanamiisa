@@ -588,7 +588,7 @@ function update() {
 
   const lastNote = beatmap.difficulties[selectedDiff].hitObjects.at(-1);
   const lastTime = lastNote ? lastNote.time : 0;
-  if (lastTime > 0 && songTime > lastTime - 2000) {
+  if (lastTime > 0 && songTime > lastTime - 500) {
     audioVolume = Math.max(0, (lastTime - songTime) / 500);
     audio.volume = audioVolume;
   }
