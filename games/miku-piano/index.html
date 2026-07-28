@@ -606,33 +606,18 @@ function update() {
 
   for (const n of activeNotes) {
     if (n.isHold && n.hit && !n.holdReleased && !n.holdBroken && holdActive[n.column] === n) {
-      if (songTime >= n.endTime) {
-        const late = songTime - n.endTime;
-        let releaseJudgment;
-        if (late <= TIMING.PERFECT) releaseJudgment = 'PERFECT';
-        else if (late <= TIMING.GREAT) releaseJudgment = 'GREAT';
-        else if (late <= TIMING.GOOD) releaseJudgment = 'GOOD';
-        else releaseJudgment = 'MISS';
-
+      if (songTime >= n.endTime + TIMING.GOOD + 50) {
         n.holdReleased = true;
         holdActive[n.column] = null;
-
+        n.holdBroken = true;
         if (!isAutoplay) {
-          if (releaseJudgment !== 'MISS') {
-            score += SCORE_VAL[releaseJudgment] * 0.5;
-            judgments[releaseJudgment]++;
-            combo++;
-            if (combo > maxCombo) maxCombo = combo;
-          } else {
-            n.holdBroken = true;
-            judgments.MISS++;
-            combo = 0;
-          }
+          judgments.MISS++;
+          combo = 0;
         }
         const ci = getColumnInfo();
         const px = ci.startX + n.column * ci.colW + ci.colW / 2;
-        popups.push({ text: releaseJudgment, color: SCORE_COLORS[releaseJudgment], x: px, y: getJudgementLineY() - 30, life: 1, vy: -1.5 });
-        spawnParticles(px, getJudgementLineY(), COL_COLORS[n.column], releaseJudgment === 'MISS' ? 2 : 6);
+        popups.push({ text: 'MISS', color: SCORE_COLORS.MISS, x: px, y: getJudgementLineY() - 30, life: 1, vy: -1.5 });
+        spawnParticles(px, getJudgementLineY(), COL_COLORS[n.column], 2);
         playHitSound(n.column);
       } else if (!isAutoplay && !keyState[n.column]) {
         n.holdBroken = true;
