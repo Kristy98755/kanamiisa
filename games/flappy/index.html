@@ -577,14 +577,6 @@ function draw() {
   ctx.fillStyle = '#0a0a12';
   ctx.fillRect(0, 0, W, H);
 
-  if (audio && audioDuration > 0 && (state === 'PLAYING' || state === 'AUTOPILOT')) {
-    const progress = Math.min(1, audio.currentTime / audioDuration);
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    ctx.fillRect(0, 0, W, 3);
-    ctx.fillStyle = '#19e6f5';
-    ctx.fillRect(0, 0, W * progress, 3);
-  }
-
   if (state === 'MENU') {
     drawMenu();
     return;
@@ -596,6 +588,14 @@ function draw() {
 
   drawPiano(-1, true);
   drawPiano(H - KEY_H + 1, false);
+
+  if (audio && audioDuration > 0 && (state === 'PLAYING' || state === 'AUTOPILOT')) {
+    const progress = Math.min(1, audio.currentTime / audioDuration);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(0, KEY_H, W, 3);
+    ctx.fillStyle = '#19e6f5';
+    ctx.fillRect(0, KEY_H, W * progress, 3);
+  }
 
   ctx.save();
   ctx.translate(bird.x, bird.y);
