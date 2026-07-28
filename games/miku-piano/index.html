@@ -418,7 +418,11 @@ function releaseNote(col) {
   const timeToEnd = hold.endTime - songTime;
   let judgment;
   if (timeToEnd <= 0) {
-    judgment = 'PERFECT';
+    const late = Math.abs(timeToEnd);
+    if (late <= TIMING.PERFECT) judgment = 'PERFECT';
+    else if (late <= TIMING.GREAT) judgment = 'GREAT';
+    else if (late <= TIMING.GOOD) judgment = 'GOOD';
+    else { hold.holdBroken = true; judgment = 'MISS'; }
   } else if (timeToEnd <= TIMING.PERFECT) {
     judgment = 'PERFECT';
   } else if (timeToEnd <= TIMING.GREAT) {
@@ -603,33 +607,33 @@ function update() {
   for (const n of activeNotes) {
     if (n.isHold && n.hit && !n.holdReleased && !n.holdBroken && holdActive[n.column] === n) {
       if (songTime >= n.endTime) {
-        if (!isAutoplay && keyState[n.column] && songTime - n.endTime > 150) {
-          n.holdReleased = true;
-          holdActive[n.column] = null;
-          score += SCORE_VAL.GREAT * 0.5;
-          judgments.GREAT++;
-          combo++;
-          if (combo > maxCombo) maxCombo = combo;
-          const ci = getColumnInfo();
-          const px = ci.startX + n.column * ci.colW + ci.colW / 2;
-          popups.push({ text: 'GREAT', color: SCORE_COLORS.GREAT, x: px, y: getJudgementLineY() - 30, life: 1, vy: -1.5 });
-          spawnParticles(px, getJudgementLineY(), COL_COLORS[n.column], 4);
-          playHitSound(n.column);
-        } else {
-          n.holdReleased = true;
-          holdActive[n.column] = null;
-          if (!isAutoplay) {
-            score += SCORE_VAL.PERFECT * 0.5;
-            judgments.PERFECT++;
+        const late = songTime - n.endTime;
+        let releaseJudgment;
+        if (late <= TIMING.PERFECT) releaseJudgment = 'PERFECT';
+        else if (late <= TIMING.GREAT) releaseJudgment = 'GREAT';
+        else if (late <= TIMING.GOOD) releaseJudgment = 'GOOD';
+        else releaseJudgment = 'MISS';
+
+        n.holdReleased = true;
+        holdActive[n.column] = null;
+
+        if (!isAutoplay) {
+          if (releaseJudgment !== 'MISS') {
+            score += SCORE_VAL[releaseJudgment] * 0.5;
+            judgments[releaseJudgment]++;
             combo++;
             if (combo > maxCombo) maxCombo = combo;
+          } else {
+            n.holdBroken = true;
+            judgments.MISS++;
+            combo = 0;
           }
-          const ci = getColumnInfo();
-          const px = ci.startX + n.column * ci.colW + ci.colW / 2;
-          popups.push({ text: 'PERFECT', color: SCORE_COLORS.PERFECT, x: px, y: getJudgementLineY() - 30, life: 1, vy: -1.5 });
-          spawnParticles(px, getJudgementLineY(), COL_COLORS[n.column], 6);
-          playHitSound(n.column);
         }
+        const ci = getColumnInfo();
+        const px = ci.startX + n.column * ci.colW + ci.colW / 2;
+        popups.push({ text: releaseJudgment, color: SCORE_COLORS[releaseJudgment], x: px, y: getJudgementLineY() - 30, life: 1, vy: -1.5 });
+        spawnParticles(px, getJudgementLineY(), COL_COLORS[n.column], releaseJudgment === 'MISS' ? 2 : 6);
+        playHitSound(n.column);
       } else if (!isAutoplay && !keyState[n.column]) {
         n.holdBroken = true;
         n.holdReleased = true;
