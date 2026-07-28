@@ -48,6 +48,14 @@
       margin: 0;
       padding: 0;
       box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    @media (pointer:coarse) {
+      * {
+        user-select: none;
+        -webkit-user-select: none;
+      }
     }
 
     body {
