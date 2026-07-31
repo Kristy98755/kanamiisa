@@ -322,7 +322,7 @@ export const MAIL_HTML = `<!doctype html>
    .drawer-nav { display:none; }
   .wrap { display:grid; grid-template-columns: 250px 380px 1fr; height: calc(100vh - 45px); }
   .col { overflow:auto; border-right:1px solid #262b36; }
-  .col.view { border-right:0; padding:22px; }
+  .col.view { border-right:0; padding:22px; display:flex; flex-direction:column; }
   .side { padding:10px; }
   .side h4 { margin:14px 6px 6px; color:#7c8696; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
   .nav { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; cursor:pointer; }
@@ -354,9 +354,13 @@ export const MAIL_HTML = `<!doctype html>
   .att { color:#c9a227; }
   .replied { color:#5fbf7f; font-size:11px; }
   .empty { color:#6b7280; padding:30px; text-align:center; }
+  .msg { display:flex; flex-direction:column; height:100%; }
   .msg h2 { margin:0 0 6px; overflow-wrap:anywhere; word-break:break-word; }
   .msg .hdr { color:#9aa4b2; margin-bottom:14px; overflow-wrap:anywhere; word-break:break-word; }
-  .msg .body { white-space:pre-wrap; background:#0c0e13; border:1px solid #20262f; border-radius:10px; padding:14px; overflow-wrap:anywhere; word-break:break-word; }
+  .msg .body { white-space:pre-wrap; background:#0c0e13; border:1px solid #20262f; border-radius:10px; padding:14px; overflow-wrap:anywhere; word-break:break-word; flex:1 1 auto; overflow:auto; min-height:0; }
+  .msg .body-wrap { flex:1 1 auto; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .msg .body-wrap iframe { flex:1 1 auto; width:100%; min-height:0; border:1px solid #20262f; border-radius:10px; background:#fff; }
+  .msg .body-wrap .body.hidden, .msg .body-wrap iframe.hidden { display:none; }
   .chips { margin-top:14px; }
   .chip { display:inline-flex; gap:6px; align-items:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:#1a2230; border:1px solid #2a3344; border-radius:8px; padding:5px 10px; margin:4px 4px 0 0; font-size:12px; }
   .note { color:#ffcf8e; font-size:12px; margin-top:14px; }
@@ -418,7 +422,7 @@ export const MAIL_HTML = `<!doctype html>
     body.mail-open .col.side,
     body.mail-open .wrap > div:nth-child(2) { display:none; }
     body.mail-open .col.view {
-      display:block; position:fixed; inset:41px 0 0 0; background:#0f1115; overflow:auto; z-index:40;
+      display:flex; flex-direction:column; position:fixed; inset:41px 0 0 0; background:#0f1115; overflow:auto; z-index:40;
       padding:14px 14px 80px; border-right:0;
       animation: mailSlide .22s ease;
     }
@@ -566,21 +570,37 @@ async function open(id){
   const atts = (m.attachments && m.attachments !== 'null') ? JSON.parse(m.attachments||'[]') : [];
   const chips = atts.length ? el('div', { class:'chips' }, atts.map(a => el('span', { class:'chip' }, '📎 ' + a.name + ' (' + ((a.size||0)/1024).toFixed(0) + ' KB)'))) : null;
 
-  const bodyWrap = el('div', { class:'body' }, m.body || '(нет текстовой части)');
+  let contentEl;
+  const bodyText = m.body || '(нет текстовой части)';
+  const bodyPlainText = el('div', { class:'body' }, bodyText);
+
+  if (m.body_html) {
+    const bodyWrap = el('div', { class:'body-wrap' });
+    const ifr = el('iframe', { sandbox:'' });
+    ifr.srcdoc = m.body_html;
+    bodyPlainText.classList.add('hidden');
+    bodyWrap.appendChild(ifr);
+    bodyWrap.appendChild(bodyPlainText);
+    contentEl = bodyWrap;
+
+    const toggleBtn = el('button', { class:'btn ghost', style:{marginTop:'10px', alignSelf:'flex-start'}, onclick: () => {
+      const isHtml = !ifr.classList.contains('hidden');
+      ifr.classList.toggle('hidden');
+      bodyPlainText.classList.toggle('hidden');
+      toggleBtn.textContent = isHtml ? 'Показать как HTML' : 'Показать как текст';
+    } }, 'Показать как текст');
+    var extraAfter = toggleBtn;
+  } else {
+    contentEl = bodyPlainText;
+    var extraAfter = null;
+  }
+
   const msg = el('div', { class:'msg' },
     el('h2', null, m.subject || '(без темы)'),
     el('div', { class:'hdr' }, 'от ' + m.sender + '  →  ' + m.recipient + '  ·  ' + fmtDate(m.date)),
-    bodyWrap
+    contentEl
   );
-  if (m.body_html) {
-    const htmlBtn = el('button', { class:'btn ghost', style:{marginTop:'10px'}, onclick: () => {
-      const ifr = el('iframe', { sandbox:'', style:{width:'100%',minHeight:'320px',border:'1px solid #20262f',borderRadius:'10px',background:'#fff'} });
-      ifr.srcdoc = m.body_html;
-      bodyWrap.replaceWith(ifr);
-      htmlBtn.remove();
-    } }, 'Показать как HTML');
-    msg.appendChild(htmlBtn);
-  }
+  if (extraAfter) msg.appendChild(extraAfter);
   if (chips) msg.appendChild(chips);
   if (S.folder !== 'sent') {
     msg.appendChild(el('div', { class:'chips' }, el('button', { class:'btn', onclick: () => reply(m) }, 'Ответить')));
