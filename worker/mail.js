@@ -312,16 +312,18 @@ export const MAIL_HTML = `<!doctype html>
 <style>
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
-  body { margin:0; font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:#0f1115; color:#e6e6e6; overflow-x:hidden; }
-  header { padding:10px 16px; background:#171a21; border-bottom:1px solid #262b36; display:flex; gap:10px; align-items:center; }
+  body { margin:0; font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; background:#0f1115; color:#e6e6e6; overflow:hidden; height:100vh; display:flex; flex-direction:column; }
+  header { padding:10px 16px; background:#171a21; border-bottom:1px solid #262b36; display:flex; gap:10px; align-items:center; flex-shrink:0; }
    header b { font-size:16px; }
    .navlink { color:#cdd3dd; text-decoration:none; font-size:13px; padding:6px 10px; border-radius:8px; }
    .navlink:hover { background:#1b1f27; }
    .hamburger { display:none; background:none; border:0; color:#e6e6e6; font-size:22px; cursor:pointer; padding:4px 8px; }
    .drawer-actions { display:none; }
    .drawer-nav { display:none; }
-  .wrap { display:grid; grid-template-columns: 250px 380px 1fr; height: calc(100vh - 45px); }
+  .wrap { display:grid; grid-template-columns: 250px 380px 1fr; flex:1; min-height:0; }
   .col { overflow:auto; border-right:1px solid #262b36; }
+  .wrap > div:nth-child(2) { display:flex; flex-direction:column; min-height:0; min-width:0; overflow-x:hidden; }
+  .wrap > div:nth-child(2) .col { flex:1; min-height:0; overflow:auto; }
   .col.view { border-right:0; padding:22px; display:flex; flex-direction:column; }
   .side { padding:10px; }
   .side h4 { margin:14px 6px 6px; color:#7c8696; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
@@ -361,6 +363,13 @@ export const MAIL_HTML = `<!doctype html>
   .msg .body-wrap { flex:1 1 auto; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
   .msg .body-wrap iframe { flex:1 1 auto; width:100%; min-height:0; border:1px solid #20262f; border-radius:10px; background:#fff; }
   .msg .body-wrap .body.hidden, .msg .body-wrap iframe.hidden { display:none; }
+  .toggle-row { display:flex; align-items:center; gap:10px; margin-top:10px; font-size:13px; color:#9aa4b2; }
+  .toggle { position:relative; width:40px; height:22px; cursor:pointer; }
+  .toggle input { opacity:0; width:0; height:0; }
+  .toggle .slider { position:absolute; inset:0; background:#2a2f3a; border-radius:11px; transition:background .2s; }
+  .toggle .slider::before { content:''; position:absolute; left:3px; top:3px; width:16px; height:16px; background:#9aa4b2; border-radius:50%; transition:transform .2s, background .2s; }
+  .toggle input:checked + .slider { background:#00f5d4; }
+  .toggle input:checked + .slider::before { transform:translateX(18px); background:#04120f; }
   .chips { margin-top:14px; }
   .chip { display:inline-flex; gap:6px; align-items:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:#1a2230; border:1px solid #2a3344; border-radius:8px; padding:5px 10px; margin:4px 4px 0 0; font-size:12px; }
   .note { color:#ffcf8e; font-size:12px; margin-top:14px; }
@@ -374,7 +383,7 @@ export const MAIL_HTML = `<!doctype html>
     header .navlink { display:none; }
     header #stat { display:none; }
     .hamburger { display:inline-flex; margin-left:auto; }
-    .wrap { grid-template-columns:1fr; height:calc(100vh - 41px); overflow-x:hidden; }
+    .wrap { grid-template-columns:1fr; flex:1; min-height:0; overflow-x:hidden; }
     .col.side {
       position:fixed; top:0; left:0; bottom:0; width:280px; background:#171a21; z-index:50;
       border-right:1px solid #262b36;
@@ -454,7 +463,7 @@ export const MAIL_HTML = `<!doctype html>
       <button class="btn ghost" id="refresh"><svg class="tb-icon" viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg><span class="tb-text">Обновить</span></button>
       <button class="btn" id="compose-btn"><svg class="tb-icon" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg><span class="tb-text">Написать</span></button>
     </div>
-    <div class="col" id="list" style="height:calc(100vh - 45px - 45px);"></div>
+    <div class="col" id="list"></div>
   </div>
   <div class="col view" id="view"><div class="empty">Выберите письмо слева.</div></div>
 </div>
@@ -583,13 +592,20 @@ async function open(id){
     bodyWrap.appendChild(bodyPlainText);
     contentEl = bodyWrap;
 
-    const toggleBtn = el('button', { class:'btn ghost', style:{marginTop:'10px', alignSelf:'flex-start'}, onclick: () => {
-      const isHtml = !ifr.classList.contains('hidden');
-      ifr.classList.toggle('hidden');
-      bodyPlainText.classList.toggle('hidden');
-      toggleBtn.textContent = isHtml ? 'Показать как HTML' : 'Показать как текст';
-    } }, 'Показать как текст');
-    var extraAfter = toggleBtn;
+    const toggleInput = el('input', { type:'checkbox', id:'htmlToggle' });
+    toggleInput.checked = true;
+    const toggleSlider = el('span', { class:'slider' });
+    const toggleLabel = el('label', { class:'toggle', for:'htmlToggle' }, toggleInput, toggleSlider);
+    toggleInput.addEventListener('change', () => {
+      const isHtml = toggleInput.checked;
+      ifr.classList.toggle('hidden', !isHtml);
+      bodyPlainText.classList.toggle('hidden', isHtml);
+    });
+    var extraAfter = el('div', { class:'toggle-row' },
+      el('span', null, 'Plaintext'),
+      toggleLabel,
+      el('span', null, 'HTML')
+    );
   } else {
     contentEl = bodyPlainText;
     var extraAfter = null;
