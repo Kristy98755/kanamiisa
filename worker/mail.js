@@ -251,7 +251,14 @@ async function notifyTelegram(env, { address, isReply, subject }) {
     await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true }),
+      body: JSON.stringify({
+        chat_id: env.TELEGRAM_CHAT_ID,
+        text,
+        disable_web_page_preview: true,
+        reply_markup: {
+          inline_keyboard: [[{ text: '📬 Перейти к почте', url: 'https://kanamiisa.uk/mail' }]],
+        },
+      }),
     });
   } catch (e) {
     console.error('[mail] telegram notify failed', e);
