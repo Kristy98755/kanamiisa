@@ -192,11 +192,14 @@ export async function handleMailApi(request, env) {
     const atts = JSON.parse(msg.attachments || "[]");
     const data = JSON.parse(msg.attachment_data || "[]");
     const idx = parseInt(m[2], 10);
-    if (idx < 0 || idx >= atts.length || !data[idx]) return json({ error: "attachment not found" }, 404);
+    // Attachment content is unavailable (dropped, pre-migration, etc.). The file
+    // is most likely sitting in the bot chat — bounce the user there instead of a dead 404.
+    const tgChat = "https://t.me/kanamiisamail_bot";
+    if (idx < 0 || idx >= atts.length || !data[idx]) return Response.redirect(tgChat, 302);
     let bin;
     if (typeof data[idx] === 'string' && data[idx].startsWith('tg:')) {
       bin = await fetchFromTelegram(env, data[idx].slice(3));
-      if (!bin) return json({ error: "failed to fetch from telegram" }, 502);
+      if (!bin) return Response.redirect(tgChat, 302);
     } else {
       bin = b64ToBytes(data[idx]);
     }
