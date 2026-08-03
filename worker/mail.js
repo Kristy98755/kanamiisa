@@ -366,11 +366,22 @@ export async function mailEmail(message, env, ctx) {
           console.error('[mail] telegram failed', te);
         }
     } catch (e) {
-      console.error("[mail] parse failed", e);
+      console.error("[mail] inbound failed", e);
+      const errMsg = `[mail ERROR] ${e.message || e}\n${e.stack || ''}`.slice(0, 1000);
+      console.error(errMsg);
       try {
         await env.MAIL_DB.prepare(
-          "INSERT INTO emails (folder, sender, recipient, subject, body, date, read) VALUES ('inbox', ?, ?, ?, ?, datetime('now'), 0)"
-        ).bind(message.from, message.to, "(не удалось разобрать письмо)", "(raw body unavailable)").run();
+          "INSERT INTO emails (folder, sender, recipient, subject, body, date, read) VALUES ('inbox', ?, ?, '⚠️ Ошибка обработки', ?, datetime('now'), 0)"
+        ).bind(message.from, message.to, errMsg).run();
+      } catch (_) {}
+      try {
+        if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) {
+          await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: errMsg }),
+          });
+        }
       } catch (_) {}
     }
   })());
