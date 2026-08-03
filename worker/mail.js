@@ -123,13 +123,27 @@ async function handleMailSend(request, env) {
       attachments,
     });
     const messageId = info && info.messageId ? info.messageId : null;
+    // Small → base64 in D1, large → Telegram (same as inbound). Never store
+    // base64 that exceeds D1's value limit — store null instead of losing the mail.
+    const attMeta = [];
+    const attData = [];
+    for (const a of attachments) {
+      const size = Math.ceil((a.content.length * 3) / 4);
+      attMeta.push({ name: a.filename, type: a.contentType, size });
+      if (size > TG_FILE_THRESHOLD) {
+        const fileId = await uploadToTelegram(env, a.filename, a.contentType, a.content);
+        if (fileId) { attData.push('tg:' + fileId); continue; }
+        console.warn(`[mail] send: tg upload failed for ${a.filename}, size=${size}`);
+      }
+      attData.push(size <= MAX_D1_B64 ? a.content : null);
+    }
     await env.MAIL_DB.prepare(
       `INSERT INTO emails (folder, sender, recipient, from_name, subject, body, body_html, html, date, message_id, in_reply_to, attachments, attachment_data, read)
        VALUES ('sent', ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, 1)`
     ).bind(
       SENDER, to, SENDER_NAME, subject, body, html || null, html ? 1 : 0, messageId, inReplyTo,
-      JSON.stringify(attachments.map((a) => ({ name: a.filename, type: a.contentType, size: Math.ceil((a.content.length * 3) / 4) }))),
-      JSON.stringify(attachments.map((a) => a.content || null))
+      JSON.stringify(attMeta),
+      JSON.stringify(attData)
     ).run();
     return json({ ok: true, messageId });
   } catch (e) {
@@ -272,6 +286,7 @@ async function notifyTelegram(env, { address, isReply, subject }) {
 }
 
 const TG_FILE_THRESHOLD = 512 * 1024; // 500KB — больше → в Telegram
+const MAX_D1_B64 = 700 * 1024; // base64-строка не может превышать ~700KB в D1
 
 // Fast base64 codecs. Per-byte loops are O(n²) (immutable strings) and kill
 // the worker's CPU budget on large files — Buffer (nodejs_compat) is ~100x faster.
@@ -345,10 +360,14 @@ export async function mailEmail(message, env, ctx) {
               console.log(`[mail] uploaded ${a.filename} → tg:${fileId.slice(0,20)}...`);
               return 'tg:' + fileId;
             }
-            console.warn(`[mail] tg upload failed for ${a.filename}, storing base64 anyway`);
+            console.warn(`[mail] tg upload failed for ${a.filename}, size=${bytes.byteLength}`);
           }
-          console.log(`[mail] att[${i}] storing as base64 (${b64.length} chars)`);
-          return b64;
+          if (b64.length <= MAX_D1_B64) {
+            console.log(`[mail] att[${i}] storing as base64 (${b64.length} chars)`);
+            return b64;
+          }
+          console.error(`[mail] att[${i}] ${a.filename} too big for D1 and tg failed, dropping content`);
+          return null;
         } catch (e) { console.error(`[mail] att[${i}] error`, e); return null; }
       }));
       console.log(`[mail] attData: ${attData.length} items, JSON size: ${JSON.stringify(attData).length}`);
