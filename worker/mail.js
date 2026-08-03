@@ -124,11 +124,12 @@ async function handleMailSend(request, env) {
     });
     const messageId = info && info.messageId ? info.messageId : null;
     await env.MAIL_DB.prepare(
-      `INSERT INTO emails (folder, sender, recipient, from_name, subject, body, body_html, html, date, message_id, in_reply_to, attachments, read)
-       VALUES ('sent', ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, 1)`
+      `INSERT INTO emails (folder, sender, recipient, from_name, subject, body, body_html, html, date, message_id, in_reply_to, attachments, attachment_data, read)
+       VALUES ('sent', ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, 1)`
     ).bind(
       SENDER, to, SENDER_NAME, subject, body, html || null, html ? 1 : 0, messageId, inReplyTo,
-      JSON.stringify(attachments.map((a) => ({ name: a.filename, type: a.contentType, size: Math.ceil((a.content.length * 3) / 4) })))
+      JSON.stringify(attachments.map((a) => ({ name: a.filename, type: a.contentType, size: Math.ceil((a.content.length * 3) / 4) }))),
+      JSON.stringify(attachments.map((a) => a.content || null))
     ).run();
     return json({ ok: true, messageId });
   } catch (e) {
@@ -170,6 +171,21 @@ export async function handleMailApi(request, env) {
   if ((m = path.match(/^\/mail\/api\/messages\/(\d+)\/delete$/)) && request.method === "POST") {
     await env.MAIL_DB.prepare("UPDATE emails SET folder = 'trash' WHERE id = ?").bind(m[1]).run();
     return json({ ok: true });
+  }
+  if ((m = path.match(/^\/mail\/api\/attachments\/(\d+)\/(\d+)$/)) && request.method === "GET") {
+    const msg = await env.MAIL_DB.prepare("SELECT attachments, attachment_data FROM emails WHERE id = ?").bind(m[1]).first();
+    if (!msg) return json({ error: "not found" }, 404);
+    const atts = JSON.parse(msg.attachments || "[]");
+    const data = JSON.parse(msg.attachment_data || "[]");
+    const idx = parseInt(m[2], 10);
+    if (idx < 0 || idx >= atts.length || !data[idx]) return json({ error: "attachment not found" }, 404);
+    const bin = Uint8Array.from(atob(data[idx]), c => c.charCodeAt(0));
+    return new Response(bin, {
+      headers: {
+        "Content-Type": atts[idx].type || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${atts[idx].name}"`,
+      },
+    });
   }
   if (path === "/mail/api/bulk" && request.method === "POST") {
     const { ids, action } = await request.json();
@@ -260,9 +276,18 @@ export async function mailEmail(message, env, ctx) {
         type: a.mimeType || "application/octet-stream",
         size: a.size || 0,
       }));
+      const attData = (email.attachments || []).map((a) => {
+        if (!a.content) return null;
+        try {
+          const bytes = new Uint8Array(a.content);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+          return btoa(binary);
+        } catch { return null; }
+      });
       await env.MAIL_DB.prepare(
-        `INSERT INTO emails (folder, sender, recipient, from_name, subject, body, body_html, html, date, message_id, in_reply_to, reply_to, attachments, read)
-         VALUES ('inbox', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
+        `INSERT INTO emails (folder, sender, recipient, from_name, subject, body, body_html, html, date, message_id, in_reply_to, reply_to, attachments, attachment_data, read)
+         VALUES ('inbox', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
       ).bind(
         email.from?.address || message.from,
         message.to,
@@ -275,7 +300,8 @@ export async function mailEmail(message, env, ctx) {
         email.messageId || null,
         email.inReplyTo || null,
         email.replyTo?.address || null,
-        JSON.stringify(atts)
+        JSON.stringify(atts),
+        JSON.stringify(attData)
       ).run();
        console.log(`[mail] stored inbound ${message.from} -> ${message.to}: ${email.subject}`);
 
@@ -372,6 +398,7 @@ export const MAIL_HTML = `<!doctype html>
   .toggle input:checked + .slider::before { transform:translateX(18px); background:#04120f; }
   .chips { margin-top:14px; }
   .chip { display:inline-flex; gap:6px; align-items:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:#1a2230; border:1px solid #2a3344; border-radius:8px; padding:5px 10px; margin:4px 4px 0 0; font-size:12px; }
+  .chip:hover { background:#243040; border-color:#3a4a5a; }
   .note { color:#ffcf8e; font-size:12px; margin-top:14px; }
   .item input[type=checkbox]{ width:18px; height:18px; accent-color:#00f5d4; flex-shrink:0; }
   .compose label { display:block; color:#7c8696; font-size:12px; margin:6px 2px 2px; }
@@ -577,7 +604,13 @@ async function open(id){
   const v = document.getElementById('view');
   v.innerHTML = '';
   const atts = (m.attachments && m.attachments !== 'null') ? JSON.parse(m.attachments||'[]') : [];
-  const chips = atts.length ? el('div', { class:'chips' }, ...atts.map(a => el('span', { class:'chip' }, '📎 ' + a.name + ' (' + ((a.size||0)/1024).toFixed(0) + ' KB)'))) : null;
+  const chips = atts.length ? el('div', { class:'chips' }, ...atts.map((a, i) => {
+    const link = el('a', {
+      class:'chip', href:'/mail/api/attachments/' + id + '/' + i, target:'_blank',
+      style:{ textDecoration:'none', color:'inherit', cursor:'pointer' },
+    }, '📎 ' + a.name + ' (' + ((a.size||0)/1024).toFixed(0) + ' KB)');
+    return link;
+  })) : null;
 
   let contentEl;
   const bodyText = m.body || '(нет текстовой части)';
