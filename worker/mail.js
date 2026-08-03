@@ -335,24 +335,27 @@ async function notifyTelegram(env, { address, isReply, subject, attachments = []
 async function sendTelegramAttachments(env, atts, attData, msgId) {
   if (!msgId || !atts.length) return;
   let sent = 0;
-  let remaining = 0;
+  let unsent = 0;
   for (let i = 0; i < atts.length; i++) {
-    if (atts[i].size > TG_FILE_THRESHOLD) continue; // already in chat as storage doc
-    if (sent < MAX_TG_ATTACH_SENDS && attData[i]) {
-      await sendAttachmentToTelegram(env, { ...atts[i], content: attData[i] }, msgId);
+    const content = attData[i];
+    // Big files that made it to Telegram are already a storage-document reply under the text.
+    if (atts[i].size > TG_FILE_THRESHOLD && typeof content === 'string' && content.startsWith('tg:')) continue;
+    if (!content) { unsent++; continue; }
+    if (sent < MAX_TG_ATTACH_SENDS) {
+      await sendAttachmentToTelegram(env, { ...atts[i], content }, msgId);
       sent++;
     } else {
-      remaining++;
+      unsent++;
     }
   }
-  if (remaining > 0) {
+  if (unsent > 0) {
     try {
       await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: env.TELEGRAM_CHAT_ID,
-          text: `…и ещё ${remaining} вложений — см. почту`,
+          text: `…и ещё ${unsent} вложений — см. почту`,
           reply_to_message_id: msgId,
           disable_notification: true,
         }),
@@ -423,7 +426,7 @@ export async function mailEmail(message, env, ctx) {
       const atts = (email.attachments || []).map((a) => ({
         name: a.filename || "attachment",
         type: a.mimeType || "application/octet-stream",
-        size: a.size || 0,
+        size: (a.content && (a.content.byteLength || a.content.length)) || a.size || 0,
       }));
       console.log(`[mail] atts metadata: ${JSON.stringify(atts.map(a => a.name + '(' + a.size + 'b)'))}`);
       // Send the text notification FIRST so every attachment lands in the chat
