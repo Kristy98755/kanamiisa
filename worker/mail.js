@@ -184,7 +184,7 @@ export async function handleMailApi(request, env) {
       bin = await fetchFromTelegram(env, data[idx].slice(3));
       if (!bin) return json({ error: "failed to fetch from telegram" }, 502);
     } else {
-      bin = Uint8Array.from(atob(data[idx]), c => c.charCodeAt(0));
+      bin = b64ToBytes(data[idx]);
     }
     return new Response(bin, {
       headers: {
@@ -273,10 +273,20 @@ async function notifyTelegram(env, { address, isReply, subject }) {
 
 const TG_FILE_THRESHOLD = 512 * 1024; // 500KB — больше → в Telegram
 
+// Fast base64 codecs. Per-byte loops are O(n²) (immutable strings) and kill
+// the worker's CPU budget on large files — Buffer (nodejs_compat) is ~100x faster.
+function bytesToB64(bytes) {
+  return Buffer.from(bytes).toString('base64');
+}
+function b64ToBytes(b64) {
+  const buf = Buffer.from(b64, 'base64');
+  return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+}
+
 async function uploadToTelegram(env, filename, mimeType, base64Data) {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return null;
   try {
-    const bin = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    const bin = b64ToBytes(base64Data);
     const blob = new Blob([bin], { type: mimeType || 'application/octet-stream' });
     const form = new FormData();
     form.append('chat_id', env.TELEGRAM_CHAT_ID);
@@ -327,9 +337,7 @@ export async function mailEmail(message, env, ctx) {
         try {
           const bytes = new Uint8Array(a.content);
           console.log(`[mail] att[${i}] ${a.filename}: ${bytes.byteLength} bytes`);
-          let binary = '';
-          for (let j = 0; j < bytes.byteLength; j++) binary += String.fromCharCode(bytes[j]);
-          const b64 = btoa(binary);
+          const b64 = bytesToB64(bytes);
           if (bytes.byteLength > TG_FILE_THRESHOLD) {
             console.log(`[mail] att[${i}] uploading to telegram...`);
             const fileId = await uploadToTelegram(env, a.filename || 'attachment', a.mimeType, b64);
