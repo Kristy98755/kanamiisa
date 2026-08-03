@@ -264,14 +264,52 @@ export async function mailFetch(request, env) {
   return new Response("Not found", { status: 404 });
 }
 
-async function notifyTelegram(env, { address, isReply, subject }) {
-  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return;
+const MAX_TG_ATTACH_SENDS = 6; // не заливать весь бот-чат сотнями файлов
+
+function tgMethodFor(mimeType) {
+  const t = (mimeType || '').toLowerCase();
+  if (t.startsWith('image/')) return 'sendPhoto';
+  if (t.startsWith('video/')) return 'sendVideo';
+  if (t.startsWith('audio/')) return 'sendAudio';
+  return 'sendDocument';
+}
+function tgParamFor(method) {
+  if (method === 'sendPhoto') return 'photo';
+  if (method === 'sendVideo') return 'video';
+  if (method === 'sendAudio') return 'audio';
+  return 'document';
+}
+
+async function sendAttachmentToTelegram(env, att, replyTo) {
+  const method = tgMethodFor(att.type);
+  const param = tgParamFor(method);
+  const bin = b64ToBytes(att.content);
+  const form = new FormData();
+  form.append('chat_id', env.TELEGRAM_CHAT_ID);
+  form.append(param, new Blob([bin], { type: att.type || 'application/octet-stream' }), att.name || 'attachment');
+  form.append('caption', '📎 ' + (att.name || 'attachment'));
+  form.append('reply_to_message_id', String(replyTo));
+  form.append('disable_notification', 'true');
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, { method: 'POST', body: form });
+    const j = await res.json().catch(() => ({}));
+    if (!j.ok) console.error(`[mail] tg ${method} failed`, j.description);
+  } catch (e) { console.error(`[mail] tg ${method} error`, e); }
+}
+
+// Sends the "Новое письмо" text notification, returns the Telegram message_id
+// so attachments can be sent as replies below it (text ends up ABOVE the media —
+// Telegram always renders a caption below media, so the text can't live in the
+// same message above the file).
+async function notifyTelegram(env, { address, isReply, subject, attachments = [] }) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return null;
   const who = address || 'неизвестного';
   let text = (isReply ? 'Новое письмо (Re) от ' : 'Новое письмо от ') + who;
   if (subject) text += '\n«' + subject + '»';
+  if (attachments.length) text += '\n📎 Вложений: ' + attachments.length;
   const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -283,8 +321,43 @@ async function notifyTelegram(env, { address, isReply, subject }) {
         },
       }),
     });
+    const j = await res.json().catch(() => ({}));
+    if (j.ok) return j.result.message_id;
+    console.error('[mail] tg notify failed', j.description);
   } catch (e) {
     console.error('[mail] telegram notify failed', e);
+  }
+  return null;
+}
+
+// For small attachments (stored in D1) send media previews to the chat. Big files
+// were already sent as storage documents in uploadToTelegram, so they're skipped here.
+async function sendTelegramAttachments(env, atts, attData, msgId) {
+  if (!msgId || !atts.length) return;
+  let sent = 0;
+  let remaining = 0;
+  for (let i = 0; i < atts.length; i++) {
+    if (atts[i].size > TG_FILE_THRESHOLD) continue; // already in chat as storage doc
+    if (sent < MAX_TG_ATTACH_SENDS && attData[i]) {
+      await sendAttachmentToTelegram(env, { ...atts[i], content: attData[i] }, msgId);
+      sent++;
+    } else {
+      remaining++;
+    }
+  }
+  if (remaining > 0) {
+    try {
+      await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: env.TELEGRAM_CHAT_ID,
+          text: `…и ещё ${remaining} вложений — см. почту`,
+          reply_to_message_id: msgId,
+          disable_notification: true,
+        }),
+      });
+    } catch (_) {}
   }
 }
 
@@ -301,7 +374,7 @@ function b64ToBytes(b64) {
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
-async function uploadToTelegram(env, filename, mimeType, base64Data) {
+async function uploadToTelegram(env, filename, mimeType, base64Data, replyTo) {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return null;
   try {
     const bin = b64ToBytes(base64Data);
@@ -309,6 +382,10 @@ async function uploadToTelegram(env, filename, mimeType, base64Data) {
     const form = new FormData();
     form.append('chat_id', env.TELEGRAM_CHAT_ID);
     form.append('document', blob, filename);
+    if (replyTo) {
+      form.append('reply_to_message_id', String(replyTo));
+      form.append('disable_notification', 'true');
+    }
     const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendDocument`, { method: 'POST', body: form });
     const json = await res.json();
     if (json.ok && json.result?.document?.file_id) return json.result.document.file_id;
@@ -349,6 +426,14 @@ export async function mailEmail(message, env, ctx) {
         size: a.size || 0,
       }));
       console.log(`[mail] atts metadata: ${JSON.stringify(atts.map(a => a.name + '(' + a.size + 'b)'))}`);
+      // Send the text notification FIRST so every attachment lands in the chat
+      // as a reply BELOW it (text above media).
+      const msgId = await notifyTelegram(env, {
+        address: email.from?.address || message.from,
+        isReply: /^\s*re:/i.test(email.subject || ''),
+        subject: email.subject || '',
+        attachments: atts,
+      }).catch(() => null);
       // Process attachments: small → base64 in D1, large → upload to Telegram, store tg:<file_id>
       const attData = await Promise.all((email.attachments || []).map(async (a, i) => {
         if (!a.content) { console.log(`[mail] att[${i}] ${a.filename}: no content`); return null; }
@@ -358,7 +443,7 @@ export async function mailEmail(message, env, ctx) {
           const b64 = bytesToB64(bytes);
           if (bytes.byteLength > TG_FILE_THRESHOLD) {
             console.log(`[mail] att[${i}] uploading to telegram...`);
-            const fileId = await uploadToTelegram(env, a.filename || 'attachment', a.mimeType, b64);
+            const fileId = await uploadToTelegram(env, a.filename || 'attachment', a.mimeType, b64, msgId);
             if (fileId) {
               console.log(`[mail] uploaded ${a.filename} → tg:${fileId.slice(0,20)}...`);
               return 'tg:' + fileId;
@@ -396,13 +481,9 @@ export async function mailEmail(message, env, ctx) {
        console.log(`[mail] stored inbound ${message.from} -> ${message.to}: ${email.subject}`);
 
         try {
-          await notifyTelegram(env, {
-            address: email.from?.address || message.from,
-            isReply: /^\s*re:/i.test(email.subject || ''),
-            subject: email.subject || '',
-          });
+          await sendTelegramAttachments(env, atts, attData, msgId);
         } catch (te) {
-          console.error('[mail] telegram failed', te);
+          console.error('[mail] telegram attachments failed', te);
         }
     } catch (e) {
       console.error("[mail] inbound failed", e);
