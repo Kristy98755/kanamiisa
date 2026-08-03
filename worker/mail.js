@@ -179,7 +179,13 @@ export async function handleMailApi(request, env) {
     const data = JSON.parse(msg.attachment_data || "[]");
     const idx = parseInt(m[2], 10);
     if (idx < 0 || idx >= atts.length || !data[idx]) return json({ error: "attachment not found" }, 404);
-    const bin = Uint8Array.from(atob(data[idx]), c => c.charCodeAt(0));
+    let bin;
+    if (typeof data[idx] === 'string' && data[idx].startsWith('tg:')) {
+      bin = await fetchFromTelegram(env, data[idx].slice(3));
+      if (!bin) return json({ error: "failed to fetch from telegram" }, 502);
+    } else {
+      bin = Uint8Array.from(atob(data[idx]), c => c.charCodeAt(0));
+    }
     return new Response(bin, {
       headers: {
         "Content-Type": atts[idx].type || "application/octet-stream",
@@ -265,6 +271,34 @@ async function notifyTelegram(env, { address, isReply, subject }) {
   }
 }
 
+const TG_FILE_THRESHOLD = 512 * 1024; // 500KB — больше → в Telegram
+
+async function uploadToTelegram(env, filename, mimeType, base64Data) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return null;
+  try {
+    const bin = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    const blob = new Blob([bin], { type: mimeType || 'application/octet-stream' });
+    const form = new FormData();
+    form.append('chat_id', env.TELEGRAM_CHAT_ID);
+    form.append('document', blob, filename);
+    const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendDocument`, { method: 'POST', body: form });
+    const json = await res.json();
+    if (json.ok && json.result?.document?.file_id) return json.result.document.file_id;
+    console.error('[mail] tg upload failed', json.description);
+    return null;
+  } catch (e) { console.error('[mail] tg upload error', e); return null; }
+}
+
+async function fetchFromTelegram(env, fileId) {
+  if (!env.TELEGRAM_BOT_TOKEN) return null;
+  try {
+    const meta = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getFile?file_id=${fileId}`).then(r => r.json());
+    if (!meta.ok) return null;
+    const bin = await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${meta.result.file_path}`).then(r => r.arrayBuffer());
+    return new Uint8Array(bin);
+  } catch (e) { console.error('[mail] tg fetch error', e); return null; }
+}
+
 // Inbound email path — real handler driven by Cloudflare Email Routing.
 export async function mailEmail(message, env, ctx) {
   ctx.waitUntil((async () => {
@@ -283,15 +317,25 @@ export async function mailEmail(message, env, ctx) {
         type: a.mimeType || "application/octet-stream",
         size: a.size || 0,
       }));
-      const attData = (email.attachments || []).map((a) => {
+      // Process attachments: small → base64 in D1, large → upload to Telegram, store tg:<file_id>
+      const attData = await Promise.all((email.attachments || []).map(async (a) => {
         if (!a.content) return null;
         try {
           const bytes = new Uint8Array(a.content);
           let binary = '';
           for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-          return btoa(binary);
+          const b64 = btoa(binary);
+          if (bytes.byteLength > TG_FILE_THRESHOLD) {
+            const fileId = await uploadToTelegram(env, a.filename || 'attachment', a.mimeType, b64);
+            if (fileId) {
+              console.log(`[mail] uploaded ${a.filename} (${bytes.byteLength}b) → tg:${fileId.slice(0,20)}...`);
+              return 'tg:' + fileId;
+            }
+            console.warn(`[mail] tg upload failed for ${a.filename}, storing base64 anyway`);
+          }
+          return b64;
         } catch { return null; }
-      });
+      }));
       await env.MAIL_DB.prepare(
         `INSERT INTO emails (folder, sender, recipient, from_name, subject, body, body_html, html, date, message_id, in_reply_to, reply_to, attachments, attachment_data, read)
          VALUES ('inbox', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
