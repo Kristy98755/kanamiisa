@@ -301,10 +301,13 @@ async function fetchFromTelegram(env, fileId) {
 
 // Inbound email path — real handler driven by Cloudflare Email Routing.
 export async function mailEmail(message, env, ctx) {
+  console.log(`[mail] >>> INBOUND from=${message.from} to=${message.to} size=${message.raw.size}`);
   ctx.waitUntil((async () => {
     try {
       const raw = await new Response(message.raw).arrayBuffer();
+      console.log(`[mail] raw buffer ${raw.byteLength} bytes`);
       const email = await PostalMime.parse(raw);
+      console.log(`[mail] parsed: subject="${email.subject}" atts=${email.attachments?.length||0}`);
       const text = email.text || (email.html ? stripHtml(email.html) : "") || "";
       let dateStr = null;
       if (email.date) {
@@ -317,25 +320,31 @@ export async function mailEmail(message, env, ctx) {
         type: a.mimeType || "application/octet-stream",
         size: a.size || 0,
       }));
+      console.log(`[mail] atts metadata: ${JSON.stringify(atts.map(a => a.name + '(' + a.size + 'b)'))}`);
       // Process attachments: small → base64 in D1, large → upload to Telegram, store tg:<file_id>
-      const attData = await Promise.all((email.attachments || []).map(async (a) => {
-        if (!a.content) return null;
+      const attData = await Promise.all((email.attachments || []).map(async (a, i) => {
+        if (!a.content) { console.log(`[mail] att[${i}] ${a.filename}: no content`); return null; }
         try {
           const bytes = new Uint8Array(a.content);
+          console.log(`[mail] att[${i}] ${a.filename}: ${bytes.byteLength} bytes`);
           let binary = '';
-          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+          for (let j = 0; j < bytes.byteLength; j++) binary += String.fromCharCode(bytes[j]);
           const b64 = btoa(binary);
           if (bytes.byteLength > TG_FILE_THRESHOLD) {
+            console.log(`[mail] att[${i}] uploading to telegram...`);
             const fileId = await uploadToTelegram(env, a.filename || 'attachment', a.mimeType, b64);
             if (fileId) {
-              console.log(`[mail] uploaded ${a.filename} (${bytes.byteLength}b) → tg:${fileId.slice(0,20)}...`);
+              console.log(`[mail] uploaded ${a.filename} → tg:${fileId.slice(0,20)}...`);
               return 'tg:' + fileId;
             }
             console.warn(`[mail] tg upload failed for ${a.filename}, storing base64 anyway`);
           }
+          console.log(`[mail] att[${i}] storing as base64 (${b64.length} chars)`);
           return b64;
-        } catch { return null; }
+        } catch (e) { console.error(`[mail] att[${i}] error`, e); return null; }
       }));
+      console.log(`[mail] attData: ${attData.length} items, JSON size: ${JSON.stringify(attData).length}`);
+      console.log(`[mail] inserting to D1...`);
       await env.MAIL_DB.prepare(
         `INSERT INTO emails (folder, sender, recipient, from_name, subject, body, body_html, html, date, message_id, in_reply_to, reply_to, attachments, attachment_data, read)
          VALUES ('inbox', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
