@@ -577,7 +577,7 @@ async function open(id){
   const v = document.getElementById('view');
   v.innerHTML = '';
   const atts = (m.attachments && m.attachments !== 'null') ? JSON.parse(m.attachments||'[]') : [];
-  const chips = atts.length ? el('div', { class:'chips' }, atts.map(a => el('span', { class:'chip' }, '📎 ' + a.name + ' (' + ((a.size||0)/1024).toFixed(0) + ' KB)'))) : null;
+  const chips = atts.length ? el('div', { class:'chips' }, ...atts.map(a => el('span', { class:'chip' }, '📎 ' + a.name + ' (' + ((a.size||0)/1024).toFixed(0) + ' KB)'))) : null;
 
   let contentEl;
   const bodyText = m.body || '(нет текстовой части)';
