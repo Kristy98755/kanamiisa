@@ -458,7 +458,70 @@
       flex-shrink: 0;
       fill: currentColor;
     }
+.recommendation {
+display:flex;
+align-items:center;
+gap:18px;
+margin:0 0 60px;
+padding:18px 22px;
+background:var(--card-bg);
+border:1px solid var(--card-border);
+border-radius:16px;
+backdrop-filter:blur(12px);
+-webkit-backdrop-filter:blur(12px);
+text-decoration:none;
+color:var(--text);
+transition:.25s;
+}
 
+.recommendation:hover{
+transform:translateY(-3px);
+border-color:var(--accent2);
+box-shadow:0 12px 32px rgba(0,0,0,.35);
+}
+
+.recommendation__icon{
+font-size:26px;
+color:var(--accent2);
+text-shadow:0 0 18px var(--accent2);
+flex-shrink:0;
+}
+
+.recommendation__body{
+flex:1;
+}
+
+.recommendation__title{
+font-family:'Space Grotesk',sans-serif;
+font-size:16px;
+font-weight:700;
+margin-bottom:4px;
+}
+
+.recommendation__text{
+font-size:14px;
+line-height:1.6;
+color:var(--text-dim);
+}
+
+.recommendation__link{
+color:var(--accent);
+font-weight:600;
+white-space:nowrap;
+margin-left:20px;
+}
+
+@media(max-width:700px){
+
+.recommendation{
+flex-wrap:wrap;
+}
+
+.recommendation__link{
+margin-left:44px;
+}
+
+}
     .footer {
       text-align: center;
       padding: 40px 0;
@@ -949,7 +1012,29 @@
         </div>
       </div>
     </div>
+<a class="recommendation"
+href="https://t.me/Sombrick"
+target="_blank"
+rel="noopener noreferrer">
 
+<div class="recommendation__icon">✦</div>
+
+<div class="recommendation__body">
+<div class="recommendation__title">
+Косплей сам себя не сошьёт
+</div>
+
+<div class="recommendation__text">
+За швейной магией — к <b>Sombrick</b>.
+Проверено на себе.
+</div>
+</div>
+
+<div class="recommendation__link">
+@Sombrick ↗
+</div>
+
+</a>
     <h2 class="section-title">Мини-игры</h2>
     <div class="games-grid">
       <a class="card" onclick="openGame('games/flappy/index.html','Flappy Miku')">
