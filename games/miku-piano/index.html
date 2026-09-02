@@ -88,6 +88,7 @@ window.addEventListener('resize', resize);
 resize();
 
 function setupKeys(numCols) {
+  numCols = Math.max(1, Math.round(numCols));
   COLS = numCols;
   const cfg = KEY_CONFIGS[numCols] || KEY_CONFIGS[4];
   COL_KEYS = [...cfg.keys];
@@ -329,7 +330,9 @@ function startGame() {
   const numCols = diff.difficulty?.CircleSize || 4;
   setupKeys(numCols);
   gameNotes = diff.hitObjects.map((n, i) => ({
-    ...n, id: i, hit: false, missed: false, holdReleased: false
+    ...n,
+    column: Math.max(0, Math.min(COLS - 1, Math.floor(n.column))),
+    id: i, hit: false, missed: false, holdReleased: false
   }));
   activeNotes = [...gameNotes];
   score = 0; combo = 0; maxCombo = 0;

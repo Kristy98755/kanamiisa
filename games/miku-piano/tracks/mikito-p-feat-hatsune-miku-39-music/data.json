@@ -28701,7 +28701,7 @@
           "x": 510,
           "time": 16093,
           "type": 1,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -28710,7 +28710,7 @@
           "x": 510,
           "time": 16209,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 16324,
           "hitSound": 0
@@ -28836,7 +28836,7 @@
           "x": 496,
           "time": 23132,
           "type": 5,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -29052,7 +29052,7 @@
           "x": 512,
           "time": 30055,
           "type": 6,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 30286,
           "hitSound": 0
@@ -29385,7 +29385,7 @@
           "x": 512,
           "time": 40324,
           "type": 1,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -29529,7 +29529,7 @@
           "x": 487,
           "time": 43786,
           "type": 1,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -29538,7 +29538,7 @@
           "x": 496,
           "time": 43901,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 44132,
           "hitSound": 0
@@ -30069,7 +30069,7 @@
           "x": 493,
           "time": 58670,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 58901,
           "hitSound": 0
@@ -30222,7 +30222,7 @@
           "x": 505,
           "time": 66055,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 66401,
           "hitSound": 0
@@ -30663,7 +30663,7 @@
           "x": 495,
           "time": 86132,
           "type": 1,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -30933,7 +30933,7 @@
           "x": 486,
           "time": 93516,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 93978,
           "hitSound": 0
@@ -31212,7 +31212,7 @@
           "x": 486,
           "time": 107593,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 107708,
           "hitSound": 0
@@ -31392,7 +31392,7 @@
           "x": 493,
           "time": 112440,
           "type": 1,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -31419,7 +31419,7 @@
           "x": 479,
           "time": 112901,
           "type": 1,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -31437,7 +31437,7 @@
           "x": 495,
           "time": 113132,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 113363,
           "hitSound": 0
@@ -31464,7 +31464,7 @@
           "x": 494,
           "time": 114055,
           "type": 5,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -31473,7 +31473,7 @@
           "x": 494,
           "time": 114286,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 114401,
           "hitSound": 0
@@ -31986,7 +31986,7 @@
           "x": 505,
           "time": 131824,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 131939,
           "hitSound": 0
@@ -32166,7 +32166,7 @@
           "x": 483,
           "time": 136670,
           "type": 6,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 136785,
           "hitSound": 0
@@ -32184,7 +32184,7 @@
           "x": 492,
           "time": 137132,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 137247,
           "hitSound": 0
@@ -32364,7 +32364,7 @@
           "x": 489,
           "time": 142093,
           "type": 5,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -32400,7 +32400,7 @@
           "x": 488,
           "time": 143016,
           "type": 1,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -32481,7 +32481,7 @@
           "x": 499,
           "time": 145324,
           "type": 5,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -32508,7 +32508,7 @@
           "x": 478,
           "time": 145670,
           "type": 5,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -32517,7 +32517,7 @@
           "x": 496,
           "time": 145785,
           "type": 1,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -32706,7 +32706,7 @@
           "x": 482,
           "time": 150286,
           "type": 6,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -32976,7 +32976,7 @@
           "x": 492,
           "time": 155016,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -32985,7 +32985,7 @@
           "x": 503,
           "time": 155132,
           "type": 6,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 155478,
           "hitSound": 0
@@ -33777,7 +33777,7 @@
           "x": 488,
           "time": 177747,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 177978,
           "hitSound": 0
@@ -34146,7 +34146,7 @@
           "x": 493,
           "time": 197363,
           "type": 1,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -34218,7 +34218,7 @@
           "x": 489,
           "time": 199209,
           "type": 1,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -34524,7 +34524,7 @@
           "x": 479,
           "time": 210516,
           "type": 6,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 210631,
           "hitSound": 0
@@ -34542,7 +34542,7 @@
           "x": 504,
           "time": 210978,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 211093,
           "hitSound": 0
@@ -34722,7 +34722,7 @@
           "x": 481,
           "time": 216055,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 216286,
           "hitSound": 0
@@ -34749,7 +34749,7 @@
           "x": 479,
           "time": 216863,
           "type": 1,
-          "column": 3.3,
+          "column": 3,
           "isHold": false,
           "endTime": null,
           "hitSound": 0
@@ -34929,7 +34929,7 @@
           "x": 483,
           "time": 222055,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 222286,
           "hitSound": 0
@@ -34956,7 +34956,7 @@
           "x": 505,
           "time": 222747,
           "type": 6,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 222862,
           "hitSound": 0
@@ -35136,7 +35136,7 @@
           "x": 482,
           "time": 227824,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 227939,
           "hitSound": 0
@@ -35361,7 +35361,7 @@
           "x": 491,
           "time": 233824,
           "type": 2,
-          "column": 3.3,
+          "column": 3,
           "isHold": true,
           "endTime": 233939,
           "hitSound": 0

@@ -41,9 +41,11 @@ function parseOsu(content) {
       const x = parseInt(parts[0]);
       const time = parseInt(parts[2]);
       const type = parseInt(parts[3]);
-      const numCols = result.difficulty.CircleSize || 4;
-
       const mode = result.general.Mode || 0;
+      const sourceCols = result.difficulty.CircleSize || 4;
+      const numCols = mode === 3
+        ? Math.max(1, Math.round(sourceCols))
+        : Math.max(4, Math.round(sourceCols));
 
       if (mode === 3) {
         const isHold = (type & 128) !== 0;
@@ -62,7 +64,7 @@ function parseOsu(content) {
         const isCircle = (type & 1) !== 0;
         const isSlider = (type & 2) !== 0;
         const isSpinner = (type & 8) !== 0;
-        const column = Math.min(Math.max(numCols, 4) - 1, Math.floor(x / (512 / Math.max(numCols, 4))));
+        const column = Math.min(numCols - 1, Math.floor(x / (512 / numCols)));
 
         if (isSpinner) {
           const endTime = parseInt(parts[5]) || time + 1000;
