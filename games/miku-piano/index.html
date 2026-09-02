@@ -70,6 +70,8 @@ let currentBreak = null;
 let COLS = 4, COL_KEYS = [], COL_NAMES = [], COL_COLORS = [];
 let keyState = [];
 let hitSounds = {};
+let hitSoundContext = null;
+let hitSoundGain = null;
 let lastFrameTime = 0;
 let lastSeekTime = 0;
 
@@ -226,9 +228,36 @@ function loadBG() {
   });
 }
 
+function ensureHitSoundContext() {
+  if (hitSoundContext) return hitSoundContext;
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  hitSoundContext = new AudioContextClass({ latencyHint: 'interactive' });
+  hitSoundGain = hitSoundContext.createGain();
+  hitSoundGain.gain.value = 0.8;
+  hitSoundGain.connect(hitSoundContext.destination);
+  return hitSoundContext;
+}
+
 function loadHitSounds() {
   const files = ['soft-hitnormal.wav', 'hithat.wav', 'snare.wav', 'kick.wav', 'lowsnare.wav', 'Hsnare.wav'];
   const names = ['normal', 'hihat', 'snare', 'kick', 'lowsnare', 'hsnare'];
+  const audioContext = ensureHitSoundContext();
+  if (audioContext) {
+    if (typeof hitSounds.normal?.getChannelData === 'function') return Promise.resolve();
+    return Promise.all(files.map((f, i) =>
+      fetch(f)
+        .then(r => {
+          if (!r.ok) throw new Error(`Failed to load ${f}: ${r.status}`);
+          return r.arrayBuffer();
+        })
+        .then(data => audioContext.decodeAudioData(data))
+        .then(buffer => { hitSounds[names[i]] = buffer; })
+        .catch(() => {})
+    ));
+  }
+
+  // Fallback for browsers without Web Audio.
   return Promise.all(files.map((f, i) => new Promise(resolve => {
     const a = new Audio(f);
     a.addEventListener('canplaythrough', () => { hitSounds[names[i]] = a; resolve(); }, { once: true });
@@ -239,11 +268,21 @@ function loadHitSounds() {
 
 function playHitSound(col) {
   const snd = hitSounds['normal'];
-  if (snd) {
-    const clone = snd.cloneNode();
-    clone.volume = 0.8;
-    clone.play().catch(() => {});
+  if (!snd) return;
+
+  if (hitSoundContext && typeof snd.getChannelData === 'function') {
+    if (hitSoundContext.state === 'suspended') hitSoundContext.resume().catch(() => {});
+    const source = hitSoundContext.createBufferSource();
+    source.buffer = snd;
+    source.connect(hitSoundGain);
+    source.onended = () => source.disconnect();
+    source.start();
+    return;
   }
+
+  const clone = snd.cloneNode();
+  clone.volume = 0.8;
+  clone.play().catch(() => {});
 }
 
 function getJudgementLineY() { return H * 0.82 - 33; }
