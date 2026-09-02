@@ -126,6 +126,7 @@ async function handleRename(id, request, env) {
 async function handleTop(url, env) {
     try {
         const game = url.searchParams.get('game');
+        const playerId = url.searchParams.get('id');
         const validGames = { flappy: 'flappy_best', piano: 'piano_best', hearts: 'hearts_best' };
         const column = validGames[game];
 
@@ -133,11 +134,33 @@ async function handleTop(url, env) {
             return jsonResponse({ error: 'Invalid game. Use: flappy, piano, hearts' }, 400);
         }
 
-        const { results } = await env.MAIL_DB.prepare(
-            `SELECT id, name, ${column} as score FROM rankings WHERE ${column} > 0 ORDER BY ${column} DESC LIMIT 10`
-        ).all();
+        const { results } = await env.MAIL_DB.prepare(`
+            SELECT
+                r.id,
+                r.name,
+                r.${column} AS score,
+                (SELECT COUNT(*) + 1 FROM rankings higher WHERE higher.${column} > r.${column}) AS rank
+            FROM rankings r
+            WHERE r.${column} > 0
+            ORDER BY r.${column} DESC
+            LIMIT 10
+        `).all();
 
-        return jsonResponse({ top: results });
+        let current = null;
+        if (playerId) {
+            const ownResult = await env.MAIL_DB.prepare(`
+                SELECT
+                    r.id,
+                    r.name,
+                    r.${column} AS score,
+                    (SELECT COUNT(*) + 1 FROM rankings higher WHERE higher.${column} > r.${column}) AS rank
+                FROM rankings r
+                WHERE r.id = ?1 AND r.${column} > 0
+            `).bind(playerId).all();
+            current = ownResult.results[0] || null;
+        }
+
+        return jsonResponse({ top: results, current });
     } catch (err) {
         return jsonResponse({ error: err.message }, 500);
     }

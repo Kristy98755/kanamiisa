@@ -1277,6 +1277,7 @@ rel="noopener noreferrer">
       s() { try { document.getElementById('gameOverlayFrame').contentWindow.gamemode.s(); } catch(e) {} }
     };
     let mikuBeamActivated = false;
+    let gameOverlayHistoryActive = false;
 
     function openGame(url, title) {
       const overlay = document.getElementById('gameOverlay');
@@ -1288,6 +1289,10 @@ rel="noopener noreferrer">
       document.querySelectorAll('.miku-note').forEach(n => n.style.display = 'none');
       const mikuEgg = document.getElementById('mikuEgg');
       if (mikuEgg) mikuEgg.style.display = 'none';
+      if (!gameOverlayHistoryActive) {
+        history.pushState({ gameOverlay: true }, '');
+        gameOverlayHistoryActive = true;
+      }
       frame.src = url;
       frame.onload = () => {
         try {
@@ -1299,15 +1304,26 @@ rel="noopener noreferrer">
       };
     }
 
-    function closeGame() {
+    function closeGame(fromHistory = false) {
       const overlay = document.getElementById('gameOverlay');
       const frame = document.getElementById('gameOverlayFrame');
+      if (!overlay.classList.contains('active')) return;
       overlay.classList.remove('active');
       document.body.style.overflow = '';
       const mikuEgg = document.getElementById('mikuEgg');
       if (mikuEgg) mikuEgg.style.display = '';
       setTimeout(() => { frame.src = 'about:blank'; }, 100);
+      if (gameOverlayHistoryActive) {
+        gameOverlayHistoryActive = false;
+        if (!fromHistory) history.back();
+      }
     }
+
+    window.addEventListener('popstate', () => {
+      if (document.getElementById('gameOverlay').classList.contains('active')) {
+        closeGame(true);
+      }
+    });
 
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && document.getElementById('gameOverlay').classList.contains('active')) {
@@ -1318,7 +1334,9 @@ rel="noopener noreferrer">
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         if (document.getElementById('gameOverlay').classList.contains('active')) {
-          closeGame();
+          try {
+            document.getElementById('gameOverlayFrame').contentWindow.postMessage('pauseGame', '*');
+          } catch (e) {}
         }
         if (window.__mikuBeamAudio) { try { window.__mikuBeamAudio.pause(); } catch (e) {} }
       }

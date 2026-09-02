@@ -25,8 +25,22 @@ function generateId(name) {
     return Date.now().toString(36) + xor4(name);
 }
 
+function ensureRankingIdentity() {
+    if (!RANKING_ID) {
+        RANKING_ID = generateId(`${Date.now()}-${Math.random()}`);
+        localStorage.setItem('ranking_id', RANKING_ID);
+    }
+    if (!RANKING_NAME) {
+        const guestNumber = (parseInt(xor4(RANKING_ID), 16) % 9999) + 1;
+        RANKING_NAME = `Гость ${guestNumber}`;
+        localStorage.setItem('ranking_name', RANKING_NAME);
+    }
+}
+
 function rankingInit(game) {
     RANKING_GAME = game;
+    ensureRankingIdentity();
+    rankingSave();
 }
 
 function getPianoAggregate() {
@@ -44,7 +58,7 @@ function getPianoAggregate() {
 }
 
 async function rankingSave() {
-    if (!RANKING_ID || !RANKING_NAME) return;
+    ensureRankingIdentity();
 
     const body = {
         id: RANKING_ID,
@@ -64,9 +78,8 @@ async function rankingSave() {
 }
 
 function rankingSetName(name) {
+    ensureRankingIdentity();
     RANKING_NAME = name;
-    RANKING_ID = generateId(name);
-    localStorage.setItem('ranking_id', RANKING_ID);
     localStorage.setItem('ranking_name', name);
 }
 
@@ -183,7 +196,7 @@ function showNameInput(container) {
         if (!name) return;
         rankingSetName(name);
         rankingSave();
-        container.innerHTML = '';
+        rankingClose();
         createOverlay();
         loadTop();
     };
@@ -201,7 +214,9 @@ async function loadTop() {
     list.innerHTML = '<div style="text-align:center;color:#666;font-size:13px">Загрузка...</div>';
 
     try {
-        const res = await fetch('/api/rankings/top?game=' + RANKING_GAME);
+        const params = new URLSearchParams({ game: RANKING_GAME });
+        if (RANKING_ID) params.set('id', RANKING_ID);
+        const res = await fetch('/api/rankings/top?' + params.toString());
         const data = await res.json();
 
         if (!data.top || data.top.length === 0) {
@@ -210,16 +225,22 @@ async function loadTop() {
         }
 
         list.innerHTML = '';
-        data.top.forEach((r, i) => {
+        getRankingRows(data).forEach((r, i) => {
             const row = document.createElement('div');
             row.style.cssText = 'display:flex;align-items:center;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,0.04)';
+            if (r.pinned) {
+                row.style.background = 'rgba(25,230,245,0.06)';
+                row.style.borderBottom = '1px solid rgba(25,230,245,0.25)';
+                row.style.marginBottom = '4px';
+            }
 
-            const medal = i === 0 ? '\uD83E\uDD47' : i === 1 ? '\uD83E\uDD48' : i === 2 ? '\uD83E\uDD49' : (i + 1);
+            const rank = Number(r.rank) || i + 1;
+            const medal = rank === 1 ? '\uD83E\uDD47' : rank === 2 ? '\uD83E\uDD48' : rank === 3 ? '\uD83E\uDD49' : rank;
             const isMe = r.id === RANKING_ID;
 
             row.innerHTML = `
-              <span style="width:30px;text-align:center;font-size:${i < 3 ? '18px' : '14px'};color:${i < 3 ? '#ffd700' : '#666'}">${medal}</span>
-              <span style="flex:1;font-size:14px;color:${isMe ? '#19e6f5' : '#ddd'};font-weight:${isMe ? '600' : '400'}">${escHtml(r.name)}</span>
+              <span style="width:30px;text-align:center;font-size:${rank <= 3 ? '18px' : '14px'};color:${rank <= 3 ? '#ffd700' : '#666'}">${medal}</span>
+              <span style="flex:1;font-size:14px;color:${isMe ? '#19e6f5' : '#ddd'};font-weight:${isMe ? '600' : '400'}">${escHtml(String(r.name))}</span>
               <span style="font-size:14px;font-weight:600;color:${isMe ? '#19e6f5' : '#fff'}">${r.score}</span>
             `;
             list.appendChild(row);
@@ -227,6 +248,20 @@ async function loadTop() {
     } catch (e) {
         list.innerHTML = '<div style="text-align:center;color:#666;font-size:13px">Ошибка загрузки</div>';
     }
+}
+
+function getRankingRows(data) {
+    const top = (data.top || []).map((row, index) => ({
+        ...row,
+        rank: Number(row.rank) || index + 1,
+        pinned: false
+    }));
+    const current = data.current;
+    if (!current || Number(current.rank) <= 4) return top;
+    return [
+        { ...current, rank: Number(current.rank), pinned: true },
+        ...top.filter(row => row.id !== current.id)
+    ];
 }
 
 function escHtml(s) {

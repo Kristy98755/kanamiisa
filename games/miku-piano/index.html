@@ -628,7 +628,7 @@ function finishGame() {
 }
 
 function pauseGame() {
-  if (state !== 'PLAYING') return;
+  if (state !== 'PLAYING' && state !== 'COUNTDOWN') return;
   state = 'PAUSED';
   pauseState = { time: songTime };
   if (audio) audio.pause();
@@ -1614,6 +1614,10 @@ document.addEventListener('keyup', e => {
       if (state === 'PLAYING') releaseNote(spaceCol);
     }
   }
+});
+
+window.addEventListener('message', e => {
+  if (e.data === 'pauseGame') pauseGame();
 });
 
 canvas.addEventListener('wheel', e => {

@@ -29,6 +29,17 @@ canvas { display: block; height: 100vh; width: auto; touch-action: none; }
 #mute-btn:hover { background: rgba(255,255,255,0.1); }
 #mute-btn svg { width: 22px; height: 22px; }
 
+#pause-btn {
+  position: fixed; top: 60px; left: 12px; z-index: 100;
+  width: 40px; height: 40px; cursor: pointer;
+  background: rgba(0,0,0,0.4); border-radius: 50%;
+  display: none; align-items: center; justify-content: center;
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: background 0.2s;
+}
+#pause-btn:hover { background: rgba(255,255,255,0.1); }
+#pause-btn svg { width: 22px; height: 22px; }
+
 #robot-btn {
   position: fixed; top: 12px; right: 12px; z-index: 100;
   width: 40px; height: 40px; cursor: pointer;
@@ -53,6 +64,13 @@ canvas { display: block; height: 100vh; width: auto; touch-action: none; }
     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
     <line x1="23" y1="9" x2="17" y2="15"/>
     <line x1="17" y1="9" x2="23" y2="15"/>
+  </svg>
+</div>
+
+<div id="pause-btn" onclick="event.stopPropagation(); pauseGame();" onpointerdown="event.stopPropagation();">
+  <svg viewBox="0 0 24 24" fill="none" stroke="#19e6f5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="19" y1="12" x2="5" y2="12"/>
+    <polyline points="12 19 5 12 12 5"/>
   </svg>
 </div>
 
@@ -143,6 +161,9 @@ let bestScore = parseInt(localStorage.getItem('flappy_best') || '0', 10);
 let selectedRadio = 0;
 let gamemodeActive = false;
 let autoplay = false;
+let runUsedAutoplay = false;
+let pausedGameState = 'PLAYING';
+let pauseButtons = [];
 let previousFrameTime = null;
 let physicsAccumulator = 0;
 
@@ -230,6 +251,8 @@ function reset() {
   gameOver = false;
   gameStarted = false;
   frameCount = 0;
+  runUsedAutoplay = false;
+  pausedGameState = 'PLAYING';
 }
 
 function getGapSize() {
@@ -275,7 +298,9 @@ function canSpawnNote() {
 }
 
 function getFinalAutopilotProgress() {
-  if (state !== 'AUTOPILOT' || !audio || audioDuration <= 0) return 0;
+  const finalAutopilotActive = state === 'AUTOPILOT' ||
+    (state === 'PAUSED' && pausedGameState === 'AUTOPILOT');
+  if (!finalAutopilotActive || !audio || audioDuration <= 0) return 0;
   const remaining = Math.max(0, audioDuration - audio.currentTime);
   return Math.max(0, Math.min(
     (VERTICAL_SPREAD_SECONDS - remaining) / VERTICAL_SPREAD_SECONDS,
@@ -524,14 +549,22 @@ function saveBest() {
 function endGame() {
   state = 'GAMEOVER';
   gameOver = true;
-  if (score > bestScore) { bestScore = score; saveBest(); rankingSave(); }
+  if (!runUsedAutoplay && score > bestScore) {
+    bestScore = score;
+    saveBest();
+    rankingSave();
+  }
   stopAudio();
 }
 
 function finishSong() {
   state = 'CONFETTI';
   gameOver = true;
-  if (score > bestScore) { bestScore = score; saveBest(); rankingSave(); }
+  if (!runUsedAutoplay && score > bestScore) {
+    bestScore = score;
+    saveBest();
+    rankingSave();
+  }
   if (currentTrackIndex >= 0) {
     markCompleted(TRACKS[selectedRadio].file);
   }
@@ -582,6 +615,38 @@ function startTrack(orderIndex) {
   });
 }
 
+function beginRun(orderIndex = selectedRadio) {
+  reset();
+  gameStarted = true;
+  state = 'PLAYING';
+  runUsedAutoplay = autoplay;
+  startTrack(orderIndex);
+  audio.play().catch(err => console.error('Flappy audio play rejected:', err));
+}
+
+function pauseGame() {
+  if (state !== 'PLAYING' && state !== 'AUTOPILOT') return;
+  pausedGameState = state;
+  state = 'PAUSED';
+  if (audio) audio.pause();
+}
+
+function resumeGame() {
+  if (state !== 'PAUSED') return;
+  state = pausedGameState;
+  if (audio) audio.play().catch(err => console.error('Flappy audio resume rejected:', err));
+}
+
+function restartGame() {
+  beginRun(selectedRadio);
+}
+
+function exitToMenu() {
+  stopAudio();
+  reset();
+  state = 'MENU';
+}
+
 function drawNoteBlock(x, top, gap, noteType) {
   if (autoplay) {
     const tH = top - KEY_H;
@@ -625,7 +690,60 @@ function drawNoteBlock(x, top, gap, noteType) {
   ctx.shadowBlur = 0;
 }
 
+function drawPauseOverlay() {
+  ctx.fillStyle = '#0a0a12';
+  ctx.globalAlpha = 0.85;
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 1;
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#19e6f5';
+  ctx.font = `bold ${Math.min(36, W * 0.06)}px Inter, sans-serif`;
+  ctx.fillText('ПАУЗА', W / 2, H * 0.3);
+
+  const btnW = Math.min(220, W * 0.6);
+  const btnH = 48;
+  const gap = 16;
+  const startY = H * 0.4;
+  const buttons = [
+    { label: 'Продолжить', color: '#19e6f5', action: 'resume' },
+    { label: 'Начать заново', color: '#ff7ac4', action: 'restart' }
+  ];
+  if (completed.length > 0) {
+    buttons.push({ label: 'В меню', color: '#ff4444', action: 'menu' });
+  }
+
+  pauseButtons = [];
+  for (let i = 0; i < buttons.length; i++) {
+    const button = buttons[i];
+    const y = startY + i * (btnH + gap);
+    ctx.fillStyle = button.color;
+    ctx.globalAlpha = 0.15;
+    ctx.beginPath();
+    roundRect(ctx, W / 2 - btnW / 2, y, btnW, btnH, 10);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = button.color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    roundRect(ctx, W / 2 - btnW / 2, y, btnW, btnH, 10);
+    ctx.stroke();
+    ctx.fillStyle = button.color;
+    ctx.font = `bold ${Math.min(22, W * 0.044)}px Inter, sans-serif`;
+    ctx.fillText(button.label, W / 2, y + btnH / 2 + 6);
+    pauseButtons.push({
+      x: W / 2 - btnW / 2,
+      y,
+      w: btnW,
+      h: btnH,
+      action: button.action
+    });
+  }
+}
+
 function draw() {
+  document.getElementById('pause-btn').style.display =
+    state === 'PLAYING' || state === 'AUTOPILOT' ? 'flex' : 'none';
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = '#0a0a12';
   ctx.fillRect(0, 0, W, H);
@@ -704,6 +822,8 @@ function draw() {
     ctx.font = '22px Inter, sans-serif';
     ctx.fillText('Счёт: ' + score, W/2, H/2 + 20);
   }
+
+  if (state === 'PAUSED') drawPauseOverlay();
 }
 
 function drawMenu() {
@@ -830,10 +950,7 @@ function flap() {
   if (state === 'CONFETTI') return;
   if (state === 'AUTOPILOT') return;
   if (!gameStarted) {
-    gameStarted = true;
-    state = 'PLAYING';
-    startTrack(selectedRadio);
-    audio.play().catch(err => console.error('Flappy audio play rejected:', err));
+    beginRun(selectedRadio);
   }
   bird.vel = FLAP;
 }
@@ -847,11 +964,7 @@ function handleMenuClick(e) {
 
   const btnX = W/2 - 100, btnY = bestScore > 0 ? 150 : 130, btnW = 200, btnH = 44;
   if (cx >= btnX && cx <= btnX + btnW && cy >= btnY && cy <= btnY + btnH) {
-    reset();
-    gameStarted = true;
-    state = 'PLAYING';
-    startTrack(selectedRadio);
-    audio.play().catch(err => console.error('Flappy audio play rejected:', err));
+    beginRun(selectedRadio);
     return true;
   }
 
@@ -888,6 +1001,21 @@ canvas.addEventListener('pointerdown', e => {
 canvas.addEventListener('click', (e) => {
   if (state === 'MENU') {
     handleMenuClick(e);
+  } else if (state === 'PAUSED') {
+    const rect = canvas.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) * W / rect.width;
+    const cy = (e.clientY - rect.top) * H / rect.height;
+    for (const button of pauseButtons) {
+      if (
+        cx >= button.x && cx <= button.x + button.w &&
+        cy >= button.y && cy <= button.y + button.h
+      ) {
+        if (button.action === 'resume') resumeGame();
+        else if (button.action === 'restart') restartGame();
+        else if (button.action === 'menu') exitToMenu();
+        return;
+      }
+    }
   } else if (state === 'GAMEOVER') {
     reset();
     state = 'MENU';
@@ -896,6 +1024,7 @@ canvas.addEventListener('click', (e) => {
 
 function toggleAutoplay() {
   autoplay = !autoplay;
+  if (autoplay && (gameStarted || state === 'PAUSED')) runUsedAutoplay = true;
   document.getElementById('robot-on').style.display = autoplay ? 'block' : 'none';
   document.getElementById('robot-off').style.display = autoplay ? 'none' : 'block';
 }
@@ -918,24 +1047,30 @@ window.gamemode = {
 document.addEventListener('keydown', e => {
   if (e.code === 'Escape') {
     e.preventDefault();
-    try { window.parent.postMessage('closeGame', '*'); } catch(ex) {}
+    if (state === 'PLAYING' || state === 'AUTOPILOT') pauseGame();
+    else if (state === 'PAUSED') resumeGame();
+    else {
+      try { window.parent.postMessage('closeGame', '*'); } catch(ex) {}
+    }
     return;
   }
   if (e.code === 'Space' || e.code === 'ArrowUp') {
     e.preventDefault();
     if (state === 'MENU') {
-      reset();
-      gameStarted = true;
-      state = 'PLAYING';
-      startTrack(selectedRadio);
-      audio.play().catch(err => console.error('Flappy audio play rejected:', err));
+      beginRun(selectedRadio);
     } else if (state === 'GAMEOVER') {
       reset();
       state = 'MENU';
+    } else if (state === 'PAUSED') {
+      resumeGame();
     } else {
       flap();
     }
   }
+});
+
+window.addEventListener('message', e => {
+  if (e.data === 'pauseGame') pauseGame();
 });
 
 reset();
