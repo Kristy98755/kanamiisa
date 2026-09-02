@@ -84,6 +84,12 @@ const W = 400, H = 700;
 canvas.width = W;
 canvas.height = H;
 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('audio-cache-sw.js').catch(error => {
+    console.warn('Flappy audio cache unavailable:', error);
+  });
+}
+
 rankingInit('flappy');
 
 function roundRect(ctx, x, y, w, h, r) {
