@@ -120,7 +120,7 @@ const BASE_SPEED = 2.2;
 const ACCEL = 0.0004;
 const BIRD_VMAX = 4;
 const NOTE_W = 50;
-const MIN_HORIZONTAL_GAP = 140;
+const BASE_HORIZONTAL_SPACING = 90 * BASE_SPEED;
 const AUTOPILOT_SECONDS = 15;
 const CLEAR_SECONDS = 5;
 
@@ -237,9 +237,27 @@ function getGapSize() {
   return cappedMaxGap - (cappedMaxGap - minGap) * Math.sin(progress * Math.PI);
 }
 
+function getHorizontalSpacing() {
+  const elapsed = audio ? audio.currentTime : 0;
+  const duration = audioDuration || 60;
+  const progress = Math.min(elapsed / duration, 1);
+  // Spread the notes until the vertical gap reaches its minimum halfway
+  // through the track, then keep the horizontal spacing fixed.
+  const spreadProgress = Math.min(progress * 2, 1);
+  const viewportCap = Math.max(BASE_HORIZONTAL_SPACING, W - NOTE_W * 3);
+  return BASE_HORIZONTAL_SPACING +
+    (viewportCap - BASE_HORIZONTAL_SPACING) * spreadProgress;
+}
+
+function canSpawnNote() {
+  if (notes.length === 0) return true;
+  const spawnX = W + 50;
+  return spawnX - notes[notes.length - 1].x >= getHorizontalSpacing();
+}
+
 function spawnNote(topOverride, gapOverride) {
+  if (!canSpawnNote()) return;
   const gapPx = gapOverride !== undefined ? gapOverride : getGapSize();
-  if (notes.length > 0 && notes[notes.length - 1].x > W + 50 - MIN_HORIZONTAL_GAP) return;
   let top;
   if (topOverride !== undefined) {
     top = topOverride;
@@ -251,7 +269,7 @@ function spawnNote(topOverride, gapOverride) {
     if (notes.length) {
       const prev = notes[notes.length - 1];
       const prevCenter = prev.top + prev.gap / 2;
-      const interval = Math.max(1, Math.floor(90 / (speed / BASE_SPEED)));
+      const interval = Math.max(1, getHorizontalSpacing() / speed);
       const maxDelta = BIRD_VMAX * interval;
       center = prevCenter + (Math.random() * 2 - 1) * maxDelta;
       center = Math.max(lo, Math.min(hi, center));
@@ -369,7 +387,7 @@ function update() {
 
     if (elapsed < spreadDuration) {
       const progress = elapsed / spreadDuration;
-      if (frameCount % Math.floor(90 / (speed / BASE_SPEED)) === 0 || notes.length === 0) {
+      if (canSpawnNote()) {
         const normalGap = getGapSize();
         const maxGap = H - KEY_H * 2;
         const gapSize = normalGap + (maxGap - normalGap) * progress;
@@ -409,7 +427,7 @@ function update() {
   }
 
   if (state === 'PLAYING') {
-    if (frameCount % Math.floor(90 / (speed / BASE_SPEED)) === 0 || notes.length === 0) {
+    if (canSpawnNote()) {
       spawnNote();
     }
   }
@@ -881,4 +899,3 @@ loop();
 </script>
 </body>
 </html>
-
