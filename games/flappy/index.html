@@ -121,6 +121,7 @@ const ACCEL = 0.0004;
 const BIRD_VMAX = 4;
 const NOTE_W = 50;
 const BASE_HORIZONTAL_SPACING = 90 * BASE_SPEED;
+const PHYSICS_STEP_MS = 1000 / 60;
 const AUTOPILOT_SECONDS = 15;
 const CLEAR_SECONDS = 5;
 
@@ -137,6 +138,8 @@ let bestScore = parseInt(localStorage.getItem('flappy_best') || '0', 10);
 let selectedRadio = 0;
 let gamemodeActive = false;
 let autoplay = false;
+let previousFrameTime = null;
+let physicsAccumulator = 0;
 
 if (shuffleOrder && shuffleOrder.length !== TRACKS.length) {
   shuffleOrder = null;
@@ -244,7 +247,7 @@ function getHorizontalSpacing() {
   // Spread the notes until the vertical gap reaches its minimum halfway
   // through the track, then keep the horizontal spacing fixed.
   const spreadProgress = Math.min(progress * 2, 1);
-  const viewportCap = Math.max(BASE_HORIZONTAL_SPACING, W - NOTE_W * 3);
+  const viewportCap = Math.max(BASE_HORIZONTAL_SPACING, W - NOTE_W * 2);
   return BASE_HORIZONTAL_SPACING +
     (viewportCap - BASE_HORIZONTAL_SPACING) * spreadProgress;
 }
@@ -770,8 +773,17 @@ function drawMenu() {
   ctx.fillText('Рейтинг', W/2, H - rankBtnH - 16 + 21);
 }
 
-function loop() {
-  update();
+function loop(timestamp) {
+  if (previousFrameTime === null) previousFrameTime = timestamp;
+  const elapsed = Math.min(timestamp - previousFrameTime, 100);
+  previousFrameTime = timestamp;
+  physicsAccumulator += elapsed;
+
+  while (physicsAccumulator >= PHYSICS_STEP_MS) {
+    update();
+    physicsAccumulator -= PHYSICS_STEP_MS;
+  }
+
   draw();
   requestAnimationFrame(loop);
 }
@@ -895,7 +907,7 @@ document.addEventListener('keydown', e => {
 });
 
 reset();
-loop();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
