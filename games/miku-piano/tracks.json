@@ -11,6 +11,17 @@
     "totalNotes": 3528
   },
   {
+    "id": "halyosy-feat-vocaloids-blessing",
+    "title": "Blessing",
+    "titleUnicode": "Blessing",
+    "artist": "halyosy feat. VOCALOIDS",
+    "artistUnicode": "halyosy feat. VOCALOIDS",
+    "audioFile": "tracks/halyosy-feat-vocaloids-blessing/audio.mp3",
+    "bgFile": "tracks/halyosy-feat-vocaloids-blessing/bg.jpg",
+    "diffCount": 3,
+    "totalNotes": 1291
+  },
+  {
     "id": "25-ji-nightcord-de-x-kagamine-len-bug",
     "title": "Bug",
     "titleUnicode": "バグ",

@@ -70,8 +70,8 @@ function parseOsu(content) {
           const endTime = parseInt(parts[5]) || time + 1000;
           result.hitObjects.push({ x, time, type, column, isHold: true, endTime, hitSound: 0 });
         } else if (isSlider) {
-          const pixelLength = parseFloat(parts[6]) || 0;
-          const repeats = parseInt(parts[7]) || 1;
+          const repeats = parseInt(parts[6]) || 1;
+          const pixelLength = parseFloat(parts[7]) || 0;
           let activeBeat = 600;
           for (const tp of result.timingPoints) {
             if (!tp.inherited && tp.offset <= time) activeBeat = tp.beatLength;
