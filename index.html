@@ -1276,6 +1276,7 @@ rel="noopener noreferrer">
       c() { try { document.getElementById('gameOverlayFrame').contentWindow.gamemode.c(); } catch(e) {} },
       s() { try { document.getElementById('gameOverlayFrame').contentWindow.gamemode.s(); } catch(e) {} }
     };
+    let mikuBeamActivated = false;
 
     function openGame(url, title) {
       const overlay = document.getElementById('gameOverlay');
@@ -1288,7 +1289,14 @@ rel="noopener noreferrer">
       const mikuEgg = document.getElementById('mikuEgg');
       if (mikuEgg) mikuEgg.style.display = 'none';
       frame.src = url;
-      frame.onload = () => { try { frame.contentWindow.focus(); } catch(e) {} };
+      frame.onload = () => {
+        try {
+          frame.contentWindow.focus();
+          if (mikuBeamActivated && url === 'games/flappy/index.html') {
+            frame.contentWindow.gamemode.c();
+          }
+        } catch(e) {}
+      };
     }
 
     function closeGame() {
@@ -1333,6 +1341,7 @@ rel="noopener noreferrer">
         mikuTimer = setTimeout(() => { mikuClicks = 0; }, 2500);
         if (mikuClicks >= 5) {
           mikuClicks = 0;
+          mikuBeamActivated = true;
           document.querySelector('.miku-overlay')?.classList.add('show');
 
           if (typeof confetti === 'function') {

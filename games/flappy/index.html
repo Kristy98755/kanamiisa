@@ -248,8 +248,20 @@ function getHorizontalSpacing() {
   // through the track, then keep the horizontal spacing fixed.
   const spreadProgress = Math.min(progress * 2, 1);
   const viewportCap = Math.max(BASE_HORIZONTAL_SPACING, W - NOTE_W * 2);
-  return BASE_HORIZONTAL_SPACING +
+  const expandedSpacing = BASE_HORIZONTAL_SPACING +
     (viewportCap - BASE_HORIZONTAL_SPACING) * spreadProgress;
+
+  // Start restoring the initial density two seconds before final autopilot.
+  const densityReturnDuration = AUTOPILOT_SECONDS + 2;
+  const densityReturnStart = Math.max(0, duration - densityReturnDuration);
+  if (elapsed <= densityReturnStart) return expandedSpacing;
+
+  const returnProgress = Math.min(
+    (elapsed - densityReturnStart) / densityReturnDuration,
+    1
+  );
+  return expandedSpacing +
+    (BASE_HORIZONTAL_SPACING - expandedSpacing) * returnProgress;
 }
 
 function canSpawnNote() {
@@ -258,27 +270,48 @@ function canSpawnNote() {
   return spawnX - notes[notes.length - 1].x >= getHorizontalSpacing();
 }
 
-function spawnNote(topOverride, gapOverride) {
+function getFinalAutopilotProgress() {
+  if (state !== 'AUTOPILOT') return 0;
+  const currentTime = audio ? audio.currentTime : autopilotStart;
+  const spreadDuration = AUTOPILOT_SECONDS - CLEAR_SECONDS;
+  return Math.max(0, Math.min(
+    (currentTime - autopilotStart) / spreadDuration,
+    1
+  ));
+}
+
+function getFinalAutopilotGeometry(top, gap) {
+  const progress = getFinalAutopilotProgress();
+  const topHeight = Math.max(0, top - KEY_H);
+  const bottomHeight = Math.max(0, H - KEY_H - top - gap);
+  const topY = KEY_H - topHeight * progress;
+  const bottomY = top + gap + bottomHeight * progress;
+  return {
+    topY,
+    topHeight,
+    bottomY,
+    bottomHeight,
+    gapTop: topY + topHeight,
+    gapBottom: bottomY
+  };
+}
+
+function spawnNote() {
   if (!canSpawnNote()) return;
-  const gapPx = gapOverride !== undefined ? gapOverride : getGapSize();
-  let top;
-  if (topOverride !== undefined) {
-    top = topOverride;
-  } else {
-    const minTop = KEY_H + 20;
-    const maxTop = H - KEY_H - gapPx - 20;
-    const lo = minTop + gapPx / 2, hi = maxTop + gapPx / 2;
-    let center = lo + Math.random() * Math.max(0, hi - lo);
-    if (notes.length) {
-      const prev = notes[notes.length - 1];
-      const prevCenter = prev.top + prev.gap / 2;
-      const interval = Math.max(1, getHorizontalSpacing() / speed);
-      const maxDelta = BIRD_VMAX * interval;
-      center = prevCenter + (Math.random() * 2 - 1) * maxDelta;
-      center = Math.max(lo, Math.min(hi, center));
-    }
-    top = center - gapPx / 2;
+  const gapPx = getGapSize();
+  const minTop = KEY_H + 20;
+  const maxTop = H - KEY_H - gapPx - 20;
+  const lo = minTop + gapPx / 2, hi = maxTop + gapPx / 2;
+  let center = lo + Math.random() * Math.max(0, hi - lo);
+  if (notes.length) {
+    const prev = notes[notes.length - 1];
+    const prevCenter = prev.top + prev.gap / 2;
+    const interval = Math.max(1, getHorizontalSpacing() / speed);
+    const maxDelta = BIRD_VMAX * interval;
+    center = prevCenter + (Math.random() * 2 - 1) * maxDelta;
+    center = Math.max(lo, Math.min(hi, center));
   }
+  const top = center - gapPx / 2;
   const noteTypes = ['♩', '♪', '♫', '♬'];
   const noteType = noteTypes[Math.floor(Math.random() * noteTypes.length)];
   notes.push({ x: W + 50, top, gap: gapPx, scored: false, noteType });
@@ -385,18 +418,7 @@ function update() {
   }
 
   if (state === 'AUTOPILOT') {
-    const elapsed = currentTime - autopilotStart;
-    const spreadDuration = AUTOPILOT_SECONDS - CLEAR_SECONDS;
-
-    if (elapsed < spreadDuration) {
-      const progress = elapsed / spreadDuration;
-      if (canSpawnNote()) {
-        const normalGap = getGapSize();
-        const maxGap = H - KEY_H * 2;
-        const gapSize = normalGap + (maxGap - normalGap) * progress;
-        spawnNote(undefined, gapSize);
-      }
-    }
+    if (canSpawnNote()) spawnNote();
 
     bird.vel += GRAVITY;
     bird.y += bird.vel;
@@ -412,7 +434,8 @@ function update() {
       }
     }
     if (nearest && nearestDist < W * 0.6) {
-      targetY = nearest.top + nearest.gap / 2;
+      const geometry = getFinalAutopilotGeometry(nearest.top, nearest.gap);
+      targetY = (geometry.gapTop + geometry.gapBottom) / 2;
     }
 
     const dy = targetY - bird.y;
@@ -478,7 +501,8 @@ function update() {
       const bw = BIRD_SIZE - 8;
       const bh = BIRD_SIZE - 8;
       if (n.x < bx + bw && n.x + NOTE_W > bx) {
-        if (by < n.top || by + bh > n.top + n.gap) {
+        const geometry = getFinalAutopilotGeometry(n.top, n.gap);
+        if (by < geometry.gapTop || by + bh > geometry.gapBottom) {
           endGame();
           return;
         }
@@ -563,33 +587,39 @@ function drawNoteBlock(x, top, gap, noteType) {
     top = KEY_H + tH * 0.7;
     gap = (H - KEY_H - bH * 0.7) - top;
   }
+  const geometry = getFinalAutopilotGeometry(top, gap);
   const grad1 = ctx.createLinearGradient(x, 0, x + NOTE_W, 0);
   grad1.addColorStop(0, '#1a1a3e');
   grad1.addColorStop(0.5, '#2a2a5e');
   grad1.addColorStop(1, '#1a1a3e');
   ctx.fillStyle = grad1;
-  ctx.fillRect(x, KEY_H, NOTE_W, top - KEY_H);
+  ctx.fillRect(x, geometry.topY, NOTE_W, geometry.topHeight);
 
   const grad2 = ctx.createLinearGradient(x, 0, x + NOTE_W, 0);
   grad2.addColorStop(0, '#1a1a3e');
   grad2.addColorStop(0.5, '#2a2a5e');
   grad2.addColorStop(1, '#1a1a3e');
   ctx.fillStyle = grad2;
-  ctx.fillRect(x, top + gap, NOTE_W, H - KEY_H - top - gap);
+  ctx.fillRect(x, geometry.bottomY, NOTE_W, geometry.bottomHeight);
 
   ctx.fillStyle = '#19e6f5';
   ctx.font = '32px serif';
   ctx.textAlign = 'center';
-  if (top > 60) ctx.fillText(noteType, x + NOTE_W/2, top/2 + KEY_H/2 + 10);
-  const bottomCenter = top + gap + (H - KEY_H - top - gap) / 2;
-  if (H - KEY_H - top - gap > 60) ctx.fillText(noteType, x + NOTE_W/2, bottomCenter + 10);
+  if (geometry.topHeight > 60) {
+    ctx.fillText(noteType, x + NOTE_W/2,
+      geometry.topY + geometry.topHeight / 2 + 10);
+  }
+  if (geometry.bottomHeight > 60) {
+    ctx.fillText(noteType, x + NOTE_W/2,
+      geometry.bottomY + geometry.bottomHeight / 2 + 10);
+  }
 
   ctx.shadowColor = '#19e6f5';
   ctx.shadowBlur = 8;
   ctx.strokeStyle = '#19e6f555';
   ctx.lineWidth = 1;
-  ctx.strokeRect(x, KEY_H, NOTE_W, top - KEY_H);
-  ctx.strokeRect(x, top + gap, NOTE_W, H - KEY_H - top - gap);
+  ctx.strokeRect(x, geometry.topY, NOTE_W, geometry.topHeight);
+  ctx.strokeRect(x, geometry.bottomY, NOTE_W, geometry.bottomHeight);
   ctx.shadowBlur = 0;
 }
 
