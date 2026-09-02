@@ -63,9 +63,14 @@ let holdActive = [], songTime = 0;
 let countdownTimer = 0, countdownValue = 0, bgDim = 0.3;
 let isAutoplay = false, songDuration = 0;
 let loadingMsg = '';
+let loadingProgress = null;
 let pauseState = null;
 let audioVolume = 1;
 let currentBreak = null;
+let loadedAudioSrc = null;
+let audioObjectUrl = null;
+
+const AUDIO_CACHE_NAME = 'miku-piano-audio-v1';
 
 let COLS = 4, COL_KEYS = [], COL_NAMES = [], COL_COLORS = [];
 let keyState = [];
@@ -164,6 +169,7 @@ loadTracks();
 function selectTrack(idx) {
   selectedTrack = tracks[idx];
   loadingMsg = 'Загрузка...';
+  loadingProgress = null;
   fetch(`tracks/${selectedTrack.id}/data.json`).then(r => r.json()).then(data => {
     beatmap = data;
     if (beatmap.difficulties) {
@@ -185,36 +191,106 @@ function selectTrack(idx) {
   }).catch(e => { loadingMsg = ''; console.error('Failed to load track data:', e); });
 }
 
-function loadAudio() {
+async function responseToAudioBlob(response) {
+  const total = Number(response.headers.get('content-length')) || 0;
+  const type = response.headers.get('content-type') || 'audio/mpeg';
+  if (!response.body || !total) {
+    const blob = await response.blob();
+    loadingProgress = 1;
+    return blob;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.byteLength;
+    loadingProgress = Math.min(1, received / total);
+  }
+  loadingProgress = 1;
+  return new Blob(chunks, { type });
+}
+
+function waitForAudioReady() {
+  if (audio.readyState >= 3) return Promise.resolve(audio);
   return new Promise((resolve, reject) => {
-    if (audio) { audio.pause(); audio = null; }
-    const src = selectedTrack ? selectedTrack.audioFile : 'audio.mp3';
-    
-    // Fetch as blob to fix Chrome file:// seeking bugs
-    fetch(src)
-      .then(r => r.blob())
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        audio = new Audio(url);
-        audio.preload = 'auto';
-        if ('mediaSession' in navigator) {
-          navigator.mediaSession.metadata = new MediaMetadata({ title: '', artist: '' });
-          ['play','pause','seekbackward','seekforward','previoustrack','nexttrack','stop'].forEach(h => {
-            try { navigator.mediaSession.setActionHandler(h, null); } catch(e) {}
-          });
-        }
-        audio.addEventListener('canplaythrough', () => {
-          songDuration = audio.duration * 1000;
-          resolve(audio);
-        }, { once: true });
-        audio.addEventListener('error', e => reject(e), { once: true });
-        audio.load();
-      })
-      .catch(e => {
-        console.error('Audio fetch failed', e);
-        reject(e);
-      });
+    audio.addEventListener('canplaythrough', () => resolve(audio), { once: true });
+    audio.addEventListener('error', reject, { once: true });
   });
+}
+
+async function loadAudio() {
+  const src = selectedTrack ? selectedTrack.audioFile : 'audio.mp3';
+
+  // A difficulty change within one track reuses the exact same player and Blob URL.
+  if (audio && loadedAudioSrc === src) {
+    audio.pause();
+    audio.currentTime = 0;
+    audio.volume = 1;
+    loadingProgress = 1;
+    await waitForAudioReady();
+    songDuration = audio.duration * 1000;
+    return audio;
+  }
+
+  if (audio) audio.pause();
+  audio = null;
+  loadedAudioSrc = null;
+  if (audioObjectUrl) URL.revokeObjectURL(audioObjectUrl);
+  audioObjectUrl = null;
+
+  try {
+    let cache = null;
+    let cached = null;
+    if ('caches' in window) {
+      try {
+        cache = await caches.open(AUDIO_CACHE_NAME);
+        cached = await cache.match(src);
+      } catch (e) {
+        console.warn('Persistent audio cache unavailable, using HTTP cache:', e);
+      }
+    }
+
+    // Track paths are immutable, so a persistent cache hit is authoritative.
+    let response = cached || await fetch(src, { cache: 'force-cache' });
+    if (response.status === 304) {
+      response = cached || (cache && await cache.match(src));
+      if (!response) throw new Error(`304 received without a cached body for ${src}`);
+    }
+    if (!response.ok) throw new Error(`Failed to load ${src}: ${response.status}`);
+
+    const contentType = response.headers.get('content-type') || 'audio/mpeg';
+    const blob = await responseToAudioBlob(response);
+    if (!cached && cache) {
+      await cache.put(src, new Response(blob, {
+        headers: {
+          'Content-Type': contentType,
+          'Content-Length': String(blob.size)
+        }
+      }));
+    }
+
+    audioObjectUrl = URL.createObjectURL(blob);
+    audio = new Audio(audioObjectUrl);
+    loadedAudioSrc = src;
+    audio.preload = 'auto';
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: '', artist: '' });
+      ['play','pause','seekbackward','seekforward','previoustrack','nexttrack','stop'].forEach(h => {
+        try { navigator.mediaSession.setActionHandler(h, null); } catch(e) {}
+      });
+    }
+    audio.load();
+    await waitForAudioReady();
+    songDuration = audio.duration * 1000;
+    return audio;
+  } catch (e) {
+    console.error('Audio fetch failed', e);
+    throw e;
+  }
 }
 
 function loadBG() {
@@ -395,9 +471,17 @@ function startGame() {
 
 async function initGame() {
   loadingMsg = 'Загрузка...';
-  await Promise.all([loadAudio(), loadBG(), loadHitSounds()]);
-  loadingMsg = '';
-  startGame();
+  loadingProgress = 0;
+  try {
+    await Promise.all([loadAudio(), loadBG(), loadHitSounds()]);
+    loadingMsg = '';
+    loadingProgress = null;
+    startGame();
+  } catch (e) {
+    loadingMsg = '';
+    loadingProgress = null;
+    console.error('Failed to initialize game:', e);
+  }
 }
 
 function hitNote(col) {
@@ -564,9 +648,7 @@ function restartGame() {
 }
 
 function exitToMenu() {
-  state = 'TRACK_SELECT';
-  bgImg = null;
-  beatmap = null;
+  state = 'MENU';
   if (audio) { audio.pause(); audio.currentTime = 0; audio.volume = 1; }
   audioVolume = 1;
   syncTouchLayer();
@@ -1324,10 +1406,37 @@ function draw() {
   if (loadingMsg) {
     ctx.fillStyle = 'rgba(10,10,18,0.75)';
     ctx.fillRect(0, 0, W, H);
+
+    const ringX = W / 2;
+    const ringY = H / 2 - 14;
+    const radius = Math.min(42, W * 0.09);
+    const lineWidth = Math.max(5, radius * 0.14);
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(25,230,245,0.18)';
+    ctx.beginPath();
+    ctx.arc(ringX, ringY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#19e6f5';
+    ctx.beginPath();
+    if (loadingProgress === null) {
+      const phase = (performance.now() / 650) % (Math.PI * 2);
+      ctx.arc(ringX, ringY, radius, phase, phase + Math.PI * 1.35);
+    } else {
+      ctx.arc(ringX, ringY, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * loadingProgress);
+    }
+    ctx.stroke();
+
     ctx.textAlign = 'center';
     ctx.fillStyle = '#19e6f5';
-    ctx.font = `bold ${Math.min(30, W * 0.055)}px Inter, sans-serif`;
-    ctx.fillText(loadingMsg, W / 2, H / 2);
+    ctx.font = `bold ${Math.min(22, W * 0.046)}px Inter, sans-serif`;
+    if (loadingProgress !== null) {
+      ctx.fillText(`${Math.round(loadingProgress * 100)}%`, ringX, ringY + 7);
+    }
+    ctx.font = `bold ${Math.min(24, W * 0.05)}px Inter, sans-serif`;
+    ctx.fillText(loadingMsg, ringX, ringY + radius + 42);
+    ctx.lineCap = 'butt';
   }
 }
 
@@ -1418,9 +1527,7 @@ function handleClick(cx, cy) {
       rankingOpen();
     }
   } else if (state === 'RESULTS') {
-    state = 'TRACK_SELECT';
-    bgImg = null;
-    beatmap = null;
+    state = 'MENU';
     if (audio) { audio.pause(); audio.currentTime = 0; audio.volume = 1; }
     syncTouchLayer();
   }
@@ -1474,9 +1581,7 @@ document.addEventListener('keydown', e => {
     } else if (state === 'MENU' && beatmap) initGame();
     else if (state === 'TRACK_SELECT' && tracks.length) {}
     else if (state === 'RESULTS') {
-      state = 'TRACK_SELECT';
-      bgImg = null;
-      beatmap = null;
+      state = 'MENU';
       if (audio) { audio.pause(); audio.currentTime = 0; audio.volume = 1; }
       syncTouchLayer();
     }
