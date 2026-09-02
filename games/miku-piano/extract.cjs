@@ -131,7 +131,7 @@ for (const oszFile of oszFiles) {
     const data = parseOsu(entry.getData().toString('utf-8'));
     const mode = data.general.Mode || (data.hitObjects.some(h => (h.type & 128) !== 0) ? 3 : 0);
     const isConvert = mode !== 3;
-    if (isConvert) data.difficulty.CircleSize = Math.max(data.difficulty.CircleSize || 4, 4);
+    if (isConvert) data.difficulty.CircleSize = Math.max(Math.round(data.difficulty.CircleSize || 4), 4);
     const version = (isConvert ? '[Convert] ' : '') + (data.metadata.Version || path.basename(entry.entryName, '.osu'));
 
     const sorted = [...data.hitObjects].sort((a, b) => a.time - b.time);
