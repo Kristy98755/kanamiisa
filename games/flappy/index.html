@@ -123,14 +123,13 @@ const NOTE_W = 50;
 const BASE_HORIZONTAL_SPACING = 90 * BASE_SPEED;
 const PHYSICS_STEP_MS = 1000 / 60;
 const AUTOPILOT_SECONDS = 15;
-const CLEAR_SECONDS = 5;
+const VERTICAL_SPREAD_SECONDS = 6;
 
 let bird, notes, score, gameOver, gameStarted, speed, frameCount;
 let state = 'MENU';
 let currentTrackIndex = -1;
 let audio = null;
 let audioDuration = 0;
-let autopilotStart = 0;
 let muted = JSON.parse(localStorage.getItem('flappy_muted') || 'false');
 let completed = JSON.parse(localStorage.getItem('flappy_completed') || '[]');
 let shuffleOrder = JSON.parse(localStorage.getItem('flappy_shuffle') || 'null');
@@ -225,7 +224,6 @@ function reset() {
   gameOver = false;
   gameStarted = false;
   frameCount = 0;
-  autopilotStart = 0;
 }
 
 function getGapSize() {
@@ -271,11 +269,10 @@ function canSpawnNote() {
 }
 
 function getFinalAutopilotProgress() {
-  if (state !== 'AUTOPILOT') return 0;
-  const currentTime = audio ? audio.currentTime : autopilotStart;
-  const spreadDuration = AUTOPILOT_SECONDS - CLEAR_SECONDS;
+  if (state !== 'AUTOPILOT' || !audio || audioDuration <= 0) return 0;
+  const remaining = Math.max(0, audioDuration - audio.currentTime);
   return Math.max(0, Math.min(
-    (currentTime - autopilotStart) / spreadDuration,
+    (VERTICAL_SPREAD_SECONDS - remaining) / VERTICAL_SPREAD_SECONDS,
     1
   ));
 }
@@ -327,7 +324,6 @@ function update() {
 
   if (state === 'PLAYING' && remaining <= AUTOPILOT_SECONDS && remaining > 0) {
     state = 'AUTOPILOT';
-    autopilotStart = currentTime;
   }
 
   if (state === 'PLAYING' && autoplay) {
