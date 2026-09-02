@@ -1,5 +1,16 @@
 [
   {
+    "id": "mikito-p-feat-hatsune-miku-39-music",
+    "title": "39 Music!",
+    "titleUnicode": "39みゅーじっく！",
+    "artist": "MikitoP feat. Hatsune Miku",
+    "artistUnicode": "みきとP feat. 初音ミク",
+    "audioFile": "tracks/mikito-p-feat-hatsune-miku-39-music/audio.mp3",
+    "bgFile": "tracks/mikito-p-feat-hatsune-miku-39-music/bg.jpg",
+    "diffCount": 7,
+    "totalNotes": 3528
+  },
+  {
     "id": "25-ji-nightcord-de-x-kagamine-len-bug",
     "title": "Bug",
     "titleUnicode": "バグ",
