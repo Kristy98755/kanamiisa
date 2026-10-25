@@ -17,6 +17,9 @@
       "id": "072e1df22e17491287febbc77eb72e47"
     }
   ],
+  "ai": {
+    "binding": "AI"
+  },
   "d1_databases": [
     {
       "binding": "MAIL_DB",

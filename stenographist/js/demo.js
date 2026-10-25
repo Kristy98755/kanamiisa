@@ -115,11 +115,11 @@ async function workerProcess(audioBlob, onProgress) {
             const formData = new FormData();
             formData.append('audio', chunkBlob, chunkFiles[i].name);
 
-            const response = await fetch(`${workerUrl}/process?mode=transcribe`, { method: 'POST', body: formData });
+            const response = await fetch(`${workerUrl}/stenographist/api/process?mode=transcribe`, { method: 'POST', body: formData });
 
             if (!response.ok) {
                 const errText = await response.text();
-                throw new Error(`Chunk ${i + 1} failed: ${response.status}`);
+                throw new Error(`Chunk ${i + 1}: ${response.status} ${errText}`);
             }
 
             const result = await response.json();
@@ -133,11 +133,11 @@ async function workerProcess(audioBlob, onProgress) {
         const formData = new FormData();
         formData.append('audio', audioBlob, 'recording.webm');
 
-        const response = await fetch(`${workerUrl}/process?mode=transcribe`, { method: 'POST', body: formData });
+        const response = await fetch(`${workerUrl}/stenographist/api/process?mode=transcribe`, { method: 'POST', body: formData });
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(`Transcribe failed: ${response.status}`);
+            throw new Error(`Transcribe: ${response.status} ${errText}`);
         }
 
         const result = await response.json();
@@ -150,7 +150,7 @@ async function workerProcess(audioBlob, onProgress) {
     const formData = new FormData();
     formData.append('transcript', fullTranscript);
 
-    const response = await fetch(`${workerUrl}/process?mode=generate`, {
+    const response = await fetch(`${workerUrl}/stenographist/api/process?mode=generate`, {
         method: 'POST',
         headers: { 'Accept': 'text/event-stream' },
         body: formData
@@ -158,7 +158,7 @@ async function workerProcess(audioBlob, onProgress) {
 
     if (!response.ok) {
         const errText = await response.text();
-        throw new Error(`Generate failed: ${response.status}`);
+        throw new Error(`Generate: ${response.status} ${errText}`);
     }
 
     const contentType = response.headers.get('content-type');

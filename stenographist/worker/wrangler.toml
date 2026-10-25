@@ -6,9 +6,8 @@ compatibility_date = "2024-12-01"
 # Workers AI is included in the free tier
 
 # --- Workers AI binding ---
-# Uncomment and add to your wrangler.toml after running `npx wrangler ai`:
-# [ai]
-# binding = "AI"
+[ai]
+binding = "AI"
 
 # --- KV Namespace for sessions ---
 [[kv_namespaces]]

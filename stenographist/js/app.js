@@ -487,7 +487,10 @@
             showResult(result);
             saveRecording(result.transcript, result.medicalHistory);
         } catch (err) {
-            showToast('Ошибка обработки');
+            console.error('[Processing]', err);
+            let msg = err && err.message ? String(err.message) : 'неизвестная ошибка';
+            if (msg.length > 300) msg = msg.slice(0, 300) + '…';
+            showToast(`Ошибка обработки: ${msg}`, 6000);
             inputSection.hidden = false;
             progressSection.hidden = true;
         }
@@ -1035,7 +1038,7 @@
         }
     }
 
-    function showToast(message) {
+    function showToast(message, duration = 2500) {
         toast.textContent = message;
         toast.hidden = false;
         requestAnimationFrame(() => {
@@ -1044,7 +1047,7 @@
         setTimeout(() => {
             toast.classList.remove('show');
             setTimeout(() => { toast.hidden = true; }, 300);
-        }, 2500);
+        }, duration);
     }
 
     // --- Start ---

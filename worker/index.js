@@ -937,6 +937,7 @@ function handleProcessSSE(audioFile, env) {
 
     return new Response(stream, {
         headers: {
+            ...corsHeaders(),
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive'
@@ -951,22 +952,24 @@ async function processFull(audioFile, env) {
 }
 
 async function transcribeAudio(audioFile, env) {
-    if (env.AI) {
-        try {
-            const audioBuffer = await audioFile.arrayBuffer();
-            const result = await env.AI.run('@cf/openai/whisper', {
-                audio: [...new Uint8Array(audioBuffer)]
-            });
-
-            if (result && result.text) {
-                return result.text;
-            }
-        } catch (err) {
-            console.warn('Workers AI Whisper failed:', err.message);
-        }
+    if (!env.AI) {
+        throw new Error('Speech-to-text service not configured (no AI binding).');
     }
 
-    throw new Error('Speech-to-text service not configured.');
+    try {
+        const audioBuffer = await audioFile.arrayBuffer();
+        const result = await env.AI.run('@cf/openai/whisper', {
+            audio: [...new Uint8Array(audioBuffer)]
+        });
+
+        if (result && result.text) {
+            return result.text;
+        }
+        throw new Error('empty result');
+    } catch (err) {
+        console.warn('Workers AI Whisper failed:', err.message);
+        throw new Error(`Speech-to-text failed: ${err.message}`);
+    }
 }
 
 async function generateMedicalHistory(transcript, env) {
@@ -1032,10 +1035,41 @@ async function generateMedicalHistory(transcript, env) {
         }
     }
 
-    throw new Error('AI model not configured.');
+    if (env.AI) {
+        try {
+            const result = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fast', {
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                max_tokens: 4096,
+                temperature: 0.3
+            });
+
+            if (result && result.response) {
+                return parseJSON(result.response);
+            }
+            throw new Error(`empty result: ${JSON.stringify(result).slice(0, 200)}`);
+        } catch (err) {
+            console.warn('Workers AI LLM failed:', err.message);
+            throw new Error(`AI generation failed: ${err.message}`);
+        }
+    }
+
+    throw new Error('AI model not configured (no GROQ_API_KEY and no AI binding).');
 }
 
 function parseJSON(text) {
+    if (text && typeof text === 'object') {
+        if (text.passport !== undefined) return text;
+        if (typeof text.content === 'string') return parseJSON(text.content);
+        if (typeof text.response === 'string') return parseJSON(text.response);
+        throw new Error(`AI returned object without schema: ${JSON.stringify(text).slice(0, 300)}`);
+    }
+    if (typeof text !== 'string') {
+        throw new Error(`AI returned non-text response: ${JSON.stringify(text).slice(0, 200)}`);
+    }
+
     let cleaned = text.trim();
     if (cleaned.startsWith('```json')) cleaned = cleaned.slice(7);
     else if (cleaned.startsWith('```')) cleaned = cleaned.slice(3);
