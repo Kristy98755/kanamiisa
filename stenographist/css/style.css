@@ -537,6 +537,12 @@ body {
     cursor: not-allowed;
 }
 
+.btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
 .btn--process {
     background: var(--color-primary);
     color: white;
@@ -1041,9 +1047,15 @@ body {
 /* Result Actions */
 .result-actions {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: 8px;
     margin-top: 16px;
+}
+
+.result-actions .btn {
+    padding: 8px 14px;
+    font-size: 13px;
 }
 
 /* JSON Section */
@@ -1160,11 +1172,18 @@ body {
     }
 
     .result-actions {
-        flex-direction: column;
+        gap: 6px;
     }
 
     .result-actions .btn {
-        width: 100%;
+        padding: 7px 10px;
+        font-size: 12px;
+        gap: 5px;
+    }
+
+    .result-actions .btn svg {
+        width: 14px;
+        height: 14px;
     }
 
     .tabs {
